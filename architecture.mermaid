@@ -1,0 +1,26 @@
+graph TD
+  subgraph Frontend ["Next.js App Router (React)"]
+    A[Client Dashboard]
+    B[Coach Dashboard]
+    C[Admin Portal]
+    D[Diet Planner]
+    E[Onboarding Form]
+  end
+
+  subgraph Cloud ["AWS Serverless Backend"]
+    F[API Gateway (HTTP API)]
+    G[Lambda: saveOnboarding (Node.js)]
+    H[Lambda: generateDiet (Python/Node)]
+    I[(DynamoDB: BlueFitDatabase)]
+  end
+
+  A -->|Fetch Tasks| F
+  B -->|Fetch Clients| F
+  C -->|Manage Roles| F
+  E -->|POST Profile| G
+  D -->|POST Preferences| H
+
+  F --> G
+  F --> H
+  G --> I
+  H --> I

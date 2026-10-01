@@ -1,0 +1,13 @@
+Category,Module,Status,Priority,Notes
+Frontend,Design System (Glassmorphism),Complete,High,Custom CSS variables and Tailwind integrated globally
+Frontend,Client Dashboard,Complete,High,Adherence rings and task trackers implemented
+Frontend,Coach Dashboard,Complete,High,Client list and KPI cards implemented
+Frontend,Admin Portal,Complete,High,Tabs for Directory Services and Analytics active
+Frontend,Diet Planner,Complete,High,Migrated to Next.js Client Component
+Frontend,Onboarding Form,Complete,High,Multi-step layout with dynamic role provisioning
+Frontend,Form State Binding,Pending,Medium,Wire React useState to onboarding inputs
+Backend,AWS SAM Infrastructure,Complete,High,API Gateway and DynamoDB provisioned
+Backend,POST /admin/onboarding,Complete,High,Node.js Lambda connected to DynamoDB
+Backend,Diet Generator Route,Complete,High,Diet orchestration active
+Backend,GET /users,Pending,High,Fetch routines needed for Coach/Admin dashboards
+Backend,Auth Integration,Pending,Critical,Cognito or NextAuth implementation required
