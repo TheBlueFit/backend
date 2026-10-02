@@ -532,19 +532,6 @@ class AssignPayload(BaseModel):
     coachId: str
 
 
-class AdminUserUpdatePayload(BaseModel):
-    name: Optional[str] = None
-    email: Optional[str] = None
-    status: Optional[str] = None
-    age: Optional[float] = None
-    height: Optional[float] = None
-    weight: Optional[float] = None
-    activityLevel: Optional[str] = None
-    primaryGoal: Optional[str] = None
-    medicalNotes: Optional[str] = None
-    specialization: Optional[str] = None
-
-
 class CheckinPayload(BaseModel):
     weight: float
     adherence: str
@@ -552,6 +539,14 @@ class CheckinPayload(BaseModel):
     clientId: Optional[str] = None      # ignored for athletes; the signed-in user is always used
     waist: Optional[float] = None
     notes: Optional[str] = None
+
+class HealthMetricsPayload(BaseModel):
+    steps: Optional[int] = None
+    sleepHours: Optional[float] = None
+    calories: Optional[int] = None
+    heartRate: Optional[int] = None
+    hydration: Optional[float] = None   # litres
+
 
 
 class TemplatePayload(BaseModel):
@@ -804,100 +799,6 @@ def complete_setup(payload: CompleteSetupPayload):
 @app.get("/admin/users")
 def get_users(user: dict = Depends(require_roles('ADMIN'))):
     return parse_decimals([pick(p, ADMIN_VIEW_FIELDS) for p in all_profiles()])
-
-
-@app.put("/admin/users/{userId}")
-def update_user(userId: str, payload: AdminUserUpdatePayload, user: dict = Depends(require_roles('ADMIN'))):
-    pk = unquote(userId).strip()
-    if '#' not in pk:
-        raise HTTPException(status_code=400, detail="userId must be a full key such as CLIENT#CLS001")
-    if pk.startswith('ADMIN#'):
-        raise HTTPException(status_code=403, detail="Admin accounts cannot be edited from here.")
-
-    profile = get_profile(pk)
-    if not profile:
-        raise HTTPException(status_code=404, detail="User not found.")
-
-    updates = {}
-    if payload.name is not None:
-        name = clean_text(payload.name, 100)
-        if not name:
-            raise HTTPException(status_code=400, detail="Name is required.")
-        updates['name'] = name
-
-    if payload.email is not None:
-        email = (clean_text(payload.email, 200) or '').lower()
-        if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
-            raise HTTPException(status_code=400, detail="A valid email address is required.")
-        for other in all_profiles():
-            if other.get('PK') != pk and str(other.get('email', '')).lower() == email:
-                raise HTTPException(status_code=409, detail="That email is already registered.")
-        updates['email'] = email
-
-    if payload.status is not None:
-        status = payload.status.strip().upper()
-        if status not in {'ACTIVE', 'INACTIVE'}:
-            raise HTTPException(status_code=400, detail="status must be ACTIVE or INACTIVE.")
-        updates['status'] = status
-
-    role = profile.get('role', 'CLIENT')
-    incoming = payload.model_dump(exclude_none=True)
-    updates.update(baseline_fields(role, incoming))
-
-    if not updates:
-        raise HTTPException(status_code=400, detail="No editable fields were supplied.")
-
-    updates['updatedAt'] = now_iso()
-    updates = to_dynamo(updates)
-    names = {f"#f{i}": k for i, k in enumerate(updates)}
-    values = {f":v{i}": v for i, v in enumerate(updates.values())}
-    expression = "SET " + ", ".join(f"#f{i} = :v{i}" for i in range(len(updates)))
-    table.update_item(
-        Key={'PK': pk, 'SK': PROFILE_SK},
-        UpdateExpression=expression,
-        ExpressionAttributeNames=names,
-        ExpressionAttributeValues=values,
-    )
-
-    fresh = get_profile(pk)
-    return {"message": "User updated successfully", "user": parse_decimals(pick(fresh or {}, ADMIN_VIEW_FIELDS))}
-
-
-@app.post("/admin/users/{userId}/reset-password")
-def reset_user_password(userId: str, user: dict = Depends(require_roles('ADMIN'))):
-    pk = unquote(userId).strip()
-    if '#' not in pk:
-        raise HTTPException(status_code=400, detail="userId must be a full key such as CLIENT#CLS001")
-    if pk.startswith('ADMIN#'):
-        raise HTTPException(status_code=403, detail="Admin passwords cannot be reset from here.")
-
-    profile = get_profile(pk)
-    if not profile:
-        raise HTTPException(status_code=404, detail="User not found.")
-
-    temp_password = generate_temp_password()
-    table.update_item(
-        Key={'PK': pk, 'SK': PROFILE_SK},
-        UpdateExpression=(
-            "SET passwordHash = :p, mustChangePassword = :m, "
-            "pwdChangedAt = :t, failedAttempts = :z, lockedUntil = :z, updatedAt = :u, status = :s"
-        ),
-        ExpressionAttributeValues={
-            ':p': hash_password(temp_password),
-            ':m': True,
-            ':t': int(time.time()) + 1,
-            ':z': 0,
-            ':u': now_iso(),
-            ':s': 'ACTIVE',
-        },
-    )
-
-    return {
-        "message": "Temporary password generated. The user must change it at next sign-in.",
-        "userId": pk,
-        "userCode": short_id(pk),
-        "tempPassword": temp_password,
-    }
 
 
 @app.post("/admin/onboarding")
@@ -1564,158 +1465,44 @@ def get_coach_client_check_status(coachId: str, clientId: str, user: dict = Depe
 
 
 # ------------------------------- athlete -----------------------------------
-def _checkin_date(item: dict) -> Optional[str]:
-    value = item.get('createdAt') or item.get('updatedAt')
-    if value:
-        dt = parse_iso(str(value))
-        if dt:
-            return dt.astimezone(timezone.utc).date().isoformat()
-    sk = str(item.get('SK', ''))
-    match = re.search(r'(\d{4}-\d{2}-\d{2})', sk)
-    return match.group(1) if match else None
-
-
-def _progress_range(range_key: str, end_date: str) -> tuple[str, str]:
-    try:
-        end = datetime.strptime(end_date, '%Y-%m-%d').date()
-    except ValueError:
-        raise HTTPException(status_code=400, detail='Invalid date. Use YYYY-MM-DD.')
-
-    days = {
-        'today': 1,
-        '7d': 7,
-        '30d': 30,
-        '3m': 90,
-        '1y': 365,
-    }.get(range_key)
-    if days is None:
-        raise HTTPException(status_code=400, detail='Invalid range. Use today, 7d, 30d, 3m, or 1y.')
-    from datetime import timedelta
-    start = end - timedelta(days=days - 1)
-    return start.isoformat(), end.isoformat()
-
-
-def _progress_point(date_key: str, checkins: list[dict], training: list[dict]) -> dict:
-    latest = sorted(
-        [c for c in checkins if _checkin_date(c) == date_key],
-        key=lambda c: str(c.get('createdAt') or c.get('updatedAt') or ''),
-        reverse=True,
-    )
-    completed_training = [t for t in training if t.get('completed') is True or str(t.get('statusText', '')).lower() == 'completed']
-    workout_values = [t for t in training if t.get('completed') is not None or 'statusText' in t]
-    row = {
-        'date': date_key,
-        'steps': None,
-        'sleepHours': None,
-        'hydration': None,
-        'weight': None,
-        'adherence': None,
-        'workoutCompletion': None,
-        'workoutsCompleted': len(completed_training),
-    }
-    if latest:
-        item = latest[0]
-        if item.get('steps') is not None: row['steps'] = float(item['steps'])
-        if item.get('sleepHours') is not None: row['sleepHours'] = float(item['sleepHours'])
-        if item.get('hydrationLiters') is not None: row['hydration'] = float(item['hydrationLiters'])
-        if item.get('weight') is not None: row['weight'] = float(item['weight'])
-        row['adherence'] = adherence_score(item.get('adherence'))
-        if item.get('workoutCompleted') is not None:
-            row['workoutCompletion'] = 100 if bool(item.get('workoutCompleted')) else 0
-    if workout_values:
-        row['workoutCompletion'] = round(100 * len(completed_training) / len(workout_values))
-    return parse_decimals(row)
-
-
 @app.get("/athlete/{athleteId}/dashboard")
 def get_athlete_dashboard(athleteId: str, date: Optional[str] = None, user: dict = Depends(current_user)):
-    """Daily athlete snapshot. The browser passes its LOCAL date (?date=YYYY-MM-DD)."""
+    """Today's training. The browser passes its LOCAL date (?date=YYYY-MM-DD) so the
+    'today' a user in India sees is not shifted by the server running in UTC."""
     client_pk = make_pk('CLIENT', athleteId)
     authorize_athlete_scope(user, client_pk)
     day = date if date and re.match(r'^\d{4}-\d{2}-\d{2}$', date) else datetime.now(timezone.utc).strftime('%Y-%m-%d')
-    training = query_all(KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with(f"TRAINING#{day}"))
-    checkins = query_all(KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with('CHECKIN#'))
-    point = _progress_point(day, checkins, training)
-    from datetime import timedelta
-    today_date = datetime.strptime(day, '%Y-%m-%d').date()
-    week_start = today_date - timedelta(days=6)
-    recent_checkins = [c for c in checkins if (_checkin_date(c) and week_start.isoformat() <= _checkin_date(c) <= day)]
-    completed_week = sum(1 for c in recent_checkins if c.get('workoutCompleted') is True)
-    workout_records = sum(1 for c in recent_checkins if c.get('workoutCompleted') is not None)
-    workouts_this_week = completed_week if workout_records else None
-    return {
-        'date': day,
-        'todayTraining': [
-            {
-                'id': i['SK'],
-                'title': i.get('title', ''),
-                'subtitle': i.get('subtitle', ''),
-                'statusText': i.get('statusText', 'pending'),
-                'statusColor': i.get('statusColor', 'gold'),
-            }
-            for i in training
-        ],
-        'steps': point['steps'],
-        'stepGoal': 8000,
-        'sleepHours': point['sleepHours'],
-        'sleepGoal': 7,
-        'hydration': point['hydration'],
-        'hydrationGoal': 2.5,
-        'workoutCompletion': point['workoutCompletion'],
-        'workoutsThisWeek': workouts_this_week,
-        'recovery': None,
-        'calories': None,
-    }
-
-
-@app.get("/athlete/{athleteId}/progress")
-def get_athlete_progress(athleteId: str, range: str = '7d', to: Optional[str] = None, user: dict = Depends(current_user)):
-    """Historical athlete progress derived from stored check-ins and training records."""
-    client_pk = make_pk('CLIENT', athleteId)
-    authorize_athlete_scope(user, client_pk)
-    end_date = to if to and re.match(r'^\d{4}-\d{2}-\d{2}$', to) else datetime.now(timezone.utc).strftime('%Y-%m-%d')
-    start_date, end_date = _progress_range(range, end_date)
-
-    checkins = query_all(KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with('CHECKIN#'))
-    training = query_all(KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with('TRAINING#'))
-
-    from datetime import timedelta
-    start = datetime.strptime(start_date, '%Y-%m-%d').date()
-    end = datetime.strptime(end_date, '%Y-%m-%d').date()
-    training_by_day = {}
-    for item in training:
-        match = re.search(r'(\d{4}-\d{2}-\d{2})', str(item.get('SK', '')))
-        if match:
-            training_by_day.setdefault(match.group(1), []).append(item)
-
-    points = []
-    cursor = start
-    while cursor <= end:
-        day_key = cursor.isoformat()
-        points.append(_progress_point(day_key, checkins, training_by_day.get(day_key, [])))
-        cursor += timedelta(days=1)
-
-    numeric = lambda key: [float(p[key]) for p in points if p.get(key) is not None]
-    def avg(key):
-        values = numeric(key)
-        return round(sum(values) / len(values), 1) if values else None
-    workouts_total = sum(int(p.get('workoutsCompleted') or 0) for p in points)
-    workout_days = [p['workoutCompletion'] for p in points if p.get('workoutCompletion') is not None]
+    items = query_all(
+        KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with(f"TRAINING#{day}")
+    )
+    # Also pull today's health snapshot (best-effort: don't fail if missing)
+    health: dict = {}
+    try:
+        h = table.get_item(Key={'PK': client_pk, 'SK': f"HEALTH#{day}"})
+        health = h.get('Item') or {}
+    except Exception:
+        pass
 
     return parse_decimals({
-        'range': range,
-        'from': start_date,
-        'to': end_date,
-        'summary': {
-            'averageSteps': avg('steps'),
-            'averageSleepHours': avg('sleepHours'),
-            'averageHydration': avg('hydration'),
-            'averageWeight': avg('weight'),
-            'averageAdherence': avg('adherence'),
-            'workoutCompletion': round(sum(workout_days) / len(workout_days)) if workout_days else None,
-            'workoutsCompleted': workouts_total,
-        },
-        'daily': points,
+        "date": day,
+        "todayTraining": [
+            {
+                "id": i['SK'],
+                "title": i.get('title', ''),
+                "subtitle": i.get('subtitle', ''),
+                "statusText": i.get('statusText', 'pending'),
+                "statusColor": i.get('statusColor', 'gold'),
+            }
+            for i in items
+        ],
+        "steps": health.get('steps'),
+        "stepGoal": 10000,
+        "sleepHours": health.get('sleepHours'),
+        "sleepGoal": 8,
+        "calories": health.get('calories'),
+        "hydration": health.get('hydration'),
+        "hydrationGoal": 3.0,
+        "heartRate": health.get('heartRate'),
     })
 
 
@@ -1746,6 +1533,82 @@ def save_checkin(payload: CheckinPayload, user: dict = Depends(require_roles('CL
     })
     table.put_item(Item=item)
     return {"message": "Check-in saved", "checkinId": item['SK']}
+
+
+
+
+@app.put("/athlete/health-metrics")
+def save_health_metrics(payload: HealthMetricsPayload, user: dict = Depends(require_roles('CLIENT'))):
+    """Receive today's device sensor data (steps, sleep, calories, HR) from the phone.
+    Values are stored on the daily profile snapshot so the athlete dashboard can
+    display them without the frontend calling the phone SDK on every render."""
+    client_pk = user['pk']
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    sk = f"HEALTH#{today}"
+
+    update_map: Dict[str, Any] = {}
+    if payload.steps is not None:
+        update_map['steps'] = payload.steps
+    if payload.sleepHours is not None:
+        update_map['sleepHours'] = Decimal(str(round(payload.sleepHours, 2)))
+    if payload.calories is not None:
+        update_map['calories'] = payload.calories
+    if payload.heartRate is not None:
+        update_map['heartRate'] = payload.heartRate
+    if payload.hydration is not None:
+        update_map['hydration'] = Decimal(str(round(payload.hydration, 2)))
+
+    if not update_map:
+        raise HTTPException(status_code=400, detail="No health metrics provided.")
+
+    update_map['updatedAt'] = now_iso()
+    update_map['type'] = 'HEALTH_SNAPSHOT'
+
+    # Build a safe UpdateExpression from the non-None fields
+    set_parts = [f"#{k} = :{k}" for k in update_map]
+    expr_names = {f"#{k}": k for k in update_map}
+    expr_values = {f":{k}": to_dynamo(v) for k, v in update_map.items()}
+
+    table.update_item(
+        Key={'PK': client_pk, 'SK': sk},
+        UpdateExpression="SET " + ", ".join(set_parts),
+        ExpressionAttributeNames=expr_names,
+        ExpressionAttributeValues=expr_values,
+    )
+    return {"message": "Health metrics saved", "date": today}
+
+
+@app.get("/athlete/{athleteId}/health-metrics")
+def get_health_metrics(athleteId: str, date: Optional[str] = None, user: dict = Depends(current_user)):
+    """Return the stored health snapshot for today (or a given date).
+    Athletes see only their own data; coaches see only their assigned clients."""
+    client_pk = make_pk('CLIENT', athleteId)
+    if user.get('role') == 'CLIENT':
+        authorize_athlete_scope(user, client_pk)
+    elif user.get('role') == 'COACH':
+        # Coach may only view assigned clients
+        profile = get_profile(client_pk)
+        if not profile or profile.get('coachId') != user['pk']:
+            raise HTTPException(status_code=403, detail="Not your client.")
+    else:
+        raise HTTPException(status_code=403, detail="Forbidden.")
+
+    day = date if date and re.match(r'^\d{4}-\d{2}-\d{2}$', date) else datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    item = get_profile.__wrapped__(client_pk) if hasattr(get_profile, '__wrapped__') else None
+    try:
+        result = table.get_item(Key={'PK': client_pk, 'SK': f"HEALTH#{day}"})
+        snapshot = result.get('Item') or {}
+    except Exception:
+        snapshot = {}
+    return parse_decimals({
+        "date": day,
+        "steps": snapshot.get('steps'),
+        "sleepHours": snapshot.get('sleepHours'),
+        "calories": snapshot.get('calories'),
+        "heartRate": snapshot.get('heartRate'),
+        "hydration": snapshot.get('hydration'),
+        "updatedAt": snapshot.get('updatedAt'),
+    })
 
 
 # Wrap the FastAPI app with Mangum to bridge it to AWS Lambda
