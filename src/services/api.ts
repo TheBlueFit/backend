@@ -95,50 +95,6 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   return res.json();
 }
 
-export interface AthleteDashboardData {
-  date: string;
-  todayTraining: any[];
-  steps?: number;
-  stepGoal?: number;
-  sleepHours?: number;
-  sleepGoal?: number;
-  hydration?: number;
-  hydrationGoal?: number;
-  workoutCompletion?: number;
-  recovery?: number;
-  calories?: number;
-  workoutsThisWeek?: number;
-}
-
-export type AthleteProgressRange = 'today' | '7d' | '30d' | '3m' | '1y';
-
-export interface AthleteProgressPoint {
-  date: string;
-  steps?: number | null;
-  sleepHours?: number | null;
-  hydration?: number | null;
-  weight?: number | null;
-  adherence?: number | null;
-  workoutCompletion?: number | null;
-  workoutsCompleted: number;
-}
-
-export interface AthleteProgressData {
-  range: AthleteProgressRange;
-  from: string;
-  to: string;
-  summary: {
-    averageSteps?: number | null;
-    averageSleepHours?: number | null;
-    averageHydration?: number | null;
-    averageWeight?: number | null;
-    averageAdherence?: number | null;
-    workoutCompletion?: number | null;
-    workoutsCompleted: number;
-  };
-  daily: AthleteProgressPoint[];
-}
-
 export interface ThreeDayPhoto {
   id: string;
   day: number;
@@ -180,7 +136,7 @@ export const dashboardAPI = {
   login: async (role: 'CLIENT' | 'COACH' | 'ADMIN', identifier: string, password: string) => {
     const user = await apiFetch<UserSession>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ role, identifier, password }),
+      body: JSON.stringify({ identifier, password, ...(role ? { role } : {}) }),
     });
     // A temporary-password login has no token yet: keep it in memory only, never in storage
     if (user.token && !user.mustChangePassword) authSession.set(user);
@@ -226,27 +182,6 @@ export const dashboardAPI = {
     apiFetch<{ message: string }>(`/admin/users/${encodeURIComponent(userId)}`, {
       method: 'DELETE',
     }),
-  updateUser: (userId: string, payload: {
-    name?: string;
-    email?: string;
-    status?: 'ACTIVE' | 'INACTIVE';
-    age?: number;
-    height?: number;
-    weight?: number;
-    activityLevel?: string;
-    primaryGoal?: string;
-    medicalNotes?: string;
-    specialization?: string;
-  }) =>
-    apiFetch<{ message: string; user: any }>(`/admin/users/${encodeURIComponent(userId)}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    }),
-  resetUserPassword: (userId: string) =>
-    apiFetch<{ message: string; userId: string; userCode: string; tempPassword: string }>(
-      `/admin/users/${encodeURIComponent(userId)}/reset-password`,
-      { method: 'POST' }
-    ),
   assignCoach: (clientId: string, coachId: string) =>
     apiFetch<{ message: string; updated: any }>(
       `/admin/users/${encodeURIComponent(clientId)}/assign`,
@@ -284,13 +219,8 @@ export const dashboardAPI = {
 
   // --- ATHLETE (CLIENT) ---
   getAthleteData: (_athleteId?: string, date?: string) =>
-    apiFetch<AthleteDashboardData>(
+    apiFetch<{ date: string; todayTraining: any[] }>(
       `/athlete/${encodeURIComponent(sessionId())}/dashboard?date=${encodeURIComponent(date || getLocalDateISO())}`
-    ),
-
-  getAthleteProgress: (range: AthleteProgressRange, to?: string) =>
-    apiFetch<AthleteProgressData>(
-      `/athlete/${encodeURIComponent(sessionId())}/progress?range=${encodeURIComponent(range)}&to=${encodeURIComponent(to || getLocalDateISO())}`
     ),
 
   // 3-Day onboarding / check-status
@@ -352,5 +282,17 @@ export const dashboardAPI = {
     apiFetch<{ message: string; checkinId: string }>('/athlete/checkin', {
       method: 'POST',
       body: JSON.stringify(payload), // the server uses the signed-in athlete, not an ID from the browser
+    }),
+
+  saveHealthMetrics: (data: {
+    steps?: number;
+    sleepHours?: number;
+    calories?: number;
+    heartRate?: number;
+    hydration?: number;
+  }) =>
+    apiFetch<{ message: string }>('/athlete/health-metrics', {
+      method: 'PUT',
+      body: JSON.stringify(data),
     }),
 };
