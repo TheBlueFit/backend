@@ -177,7 +177,7 @@ export interface ThreeDayLogResponse {
 
 export const dashboardAPI = {
   // --- AUTH & FIRST-TIME SETUP ---
-  login: async (role: 'CLIENT' | 'COACH' | 'ADMIN', identifier: string, password: string) => {
+  login: async (role: 'CLIENT' | 'COACH' | 'ADMIN' | undefined, identifier: string, password: string) => {
     const user = await apiFetch<UserSession>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ role, identifier, password }),
