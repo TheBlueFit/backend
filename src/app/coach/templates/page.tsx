@@ -27,7 +27,7 @@ export default function PlanTemplates() {
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
-        const data = await dashboardAPI.getCoachTemplates('coach-123');
+        const data = await dashboardAPI.getCoachTemplates();
         setTemplates(data.templates);
       } catch (error) {
         console.error("Failed to fetch templates:", error);

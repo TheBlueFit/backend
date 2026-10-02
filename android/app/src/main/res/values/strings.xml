@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Blue Fit</string>
-    <string name="title_activity_main">Blue Fit</string>
+    <string name="app_name">The Blue Fit</string>
+    <string name="title_activity_main">The Blue Fit</string>
     <string name="package_name">com.thebluefit.app</string>
     <string name="custom_url_scheme">com.thebluefit.app</string>
 </resources>

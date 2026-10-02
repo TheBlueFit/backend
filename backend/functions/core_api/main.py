@@ -52,6 +52,8 @@ app.add_middleware(
 
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(TABLE_NAME)
+s3 = boto3.client('s3')
+CLIENT_MEDIA_BUCKET = os.environ.get('CLIENT_MEDIA_BUCKET')
 
 # ---------------------------------------------------------------------------
 # SINGLE-TABLE LAYOUT  (table: BlueFit-Table, keys: PK + SK)
@@ -530,6 +532,19 @@ class AssignPayload(BaseModel):
     coachId: str
 
 
+class AdminUserUpdatePayload(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    status: Optional[str] = None
+    age: Optional[float] = None
+    height: Optional[float] = None
+    weight: Optional[float] = None
+    activityLevel: Optional[str] = None
+    primaryGoal: Optional[str] = None
+    medicalNotes: Optional[str] = None
+    specialization: Optional[str] = None
+
+
 class CheckinPayload(BaseModel):
     weight: float
     adherence: str
@@ -546,6 +561,125 @@ class TemplatePayload(BaseModel):
     workoutDays: Optional[str] = None
     activities: Optional[str] = None
     exercises: Optional[List[Dict[str, Any]]] = None
+
+
+class ThreeDayLogPayload(BaseModel):
+    meals: Dict[str, str] = {}
+
+
+class ThreeDayPhotoUploadPayload(BaseModel):
+    day: int
+    meal: str
+    fileName: str
+    contentType: str
+
+
+class ThreeDayPhotoCompletePayload(BaseModel):
+    day: int
+    meal: str
+    objectKey: str
+    originalFileName: Optional[str] = None
+
+
+THREE_DAY_MEALS = ('Breakfast', 'Brunch', 'Lunch', 'Snacks', 'Dinner')
+THREE_DAY_DAYS = (1, 2, 3)
+ALLOWED_IMAGE_TYPES = {
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/webp': '.webp',
+    'image/heic': '.heic',
+    'image/heif': '.heif',
+}
+MAX_CLIENT_PHOTO_BYTES = 10 * 1024 * 1024
+
+
+def validate_three_day_day(day: int) -> None:
+    if day not in THREE_DAY_DAYS:
+        raise HTTPException(status_code=400, detail='Day must be 1, 2 or 3.')
+
+
+def validate_three_day_meal(meal: str) -> str:
+    clean = clean_text(meal, 30) or ''
+    match = next((m for m in THREE_DAY_MEALS if m.lower() == clean.lower()), None)
+    if not match:
+        raise HTTPException(status_code=400, detail='Invalid meal.')
+    return match
+
+
+def three_day_log_item(client_pk: str, day: int) -> Optional[dict]:
+    return table.get_item(Key={'PK': client_pk, 'SK': f'3DAYLOG#DAY{day}'}).get('Item')
+
+
+def three_day_status(client_pk: str) -> dict:
+    items = query_all(KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with('3DAY'))
+    logs = {int(i['SK'][-1]): i for i in items if i['SK'].startswith('3DAYLOG#DAY') and i['SK'][-1:].isdigit()}
+    photos_by_day: Dict[int, List[dict]] = {1: [], 2: [], 3: []}
+
+    for item in items:
+        if not item['SK'].startswith('3DAYPHOTO#DAY'):
+            continue
+        parts = item['SK'].split('#')
+        if len(parts) != 3 or not parts[1].startswith('DAY'):
+            continue
+        try:
+            day = int(parts[1][3:])
+        except ValueError:
+            continue
+        if day not in photos_by_day:
+            continue
+        view_url = None
+        if CLIENT_MEDIA_BUCKET:
+            try:
+                view_url = s3.generate_presigned_url(
+                    'get_object',
+                    Params={'Bucket': CLIENT_MEDIA_BUCKET, 'Key': item['objectKey']},
+                    ExpiresIn=300,
+                )
+            except ClientError:
+                view_url = None
+        photos_by_day[day].append({
+            'id': item['SK'],
+            'day': day,
+            'meal': item.get('meal', ''),
+            'originalFileName': item.get('originalFileName', ''),
+            'contentType': item.get('contentType', ''),
+            'uploadedAt': item.get('uploadedAt', item.get('createdAt', '')),
+            'viewUrl': view_url,
+        })
+
+    output_days = []
+    completed_count = 0
+    started_count = 0
+    for day in THREE_DAY_DAYS:
+        meals = {m: str((logs.get(day) or {}).get('meals', {}).get(m, '')) for m in THREE_DAY_MEALS}
+        has_meals = any(v.strip() for v in meals.values())
+        photos = sorted(photos_by_day[day], key=lambda x: x.get('uploadedAt', ''))
+        started = has_meals or bool(photos)
+        status = 'COMPLETE' if started else 'NOT_STARTED'
+        if started:
+            started_count += 1
+        if started:
+            # A day is considered complete once it has at least one saved entry or photo.
+            completed_count += 1
+        output_days.append({
+            'day': day,
+            'status': status if status == 'COMPLETE' else ('IN_PROGRESS' if started else 'NOT_STARTED'),
+            'meals': meals,
+            'photos': photos,
+        })
+
+    if completed_count == 3:
+        overall = 'COMPLETE'
+    elif started_count > 0:
+        overall = 'IN_PROGRESS'
+    else:
+        overall = 'NOT_STARTED'
+
+    return {
+        'onboardingCompleted': bool((get_profile(client_pk) or {}).get('onboardingCompleted', False)),
+        'overallStatus': overall,
+        'days': output_days,
+    }
 
 
 def check_range(label: str, value: Optional[float], low: float, high: float) -> None:
@@ -670,6 +804,100 @@ def complete_setup(payload: CompleteSetupPayload):
 @app.get("/admin/users")
 def get_users(user: dict = Depends(require_roles('ADMIN'))):
     return parse_decimals([pick(p, ADMIN_VIEW_FIELDS) for p in all_profiles()])
+
+
+@app.put("/admin/users/{userId}")
+def update_user(userId: str, payload: AdminUserUpdatePayload, user: dict = Depends(require_roles('ADMIN'))):
+    pk = unquote(userId).strip()
+    if '#' not in pk:
+        raise HTTPException(status_code=400, detail="userId must be a full key such as CLIENT#CLS001")
+    if pk.startswith('ADMIN#'):
+        raise HTTPException(status_code=403, detail="Admin accounts cannot be edited from here.")
+
+    profile = get_profile(pk)
+    if not profile:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    updates = {}
+    if payload.name is not None:
+        name = clean_text(payload.name, 100)
+        if not name:
+            raise HTTPException(status_code=400, detail="Name is required.")
+        updates['name'] = name
+
+    if payload.email is not None:
+        email = (clean_text(payload.email, 200) or '').lower()
+        if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+            raise HTTPException(status_code=400, detail="A valid email address is required.")
+        for other in all_profiles():
+            if other.get('PK') != pk and str(other.get('email', '')).lower() == email:
+                raise HTTPException(status_code=409, detail="That email is already registered.")
+        updates['email'] = email
+
+    if payload.status is not None:
+        status = payload.status.strip().upper()
+        if status not in {'ACTIVE', 'INACTIVE'}:
+            raise HTTPException(status_code=400, detail="status must be ACTIVE or INACTIVE.")
+        updates['status'] = status
+
+    role = profile.get('role', 'CLIENT')
+    incoming = payload.model_dump(exclude_none=True)
+    updates.update(baseline_fields(role, incoming))
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="No editable fields were supplied.")
+
+    updates['updatedAt'] = now_iso()
+    updates = to_dynamo(updates)
+    names = {f"#f{i}": k for i, k in enumerate(updates)}
+    values = {f":v{i}": v for i, v in enumerate(updates.values())}
+    expression = "SET " + ", ".join(f"#f{i} = :v{i}" for i in range(len(updates)))
+    table.update_item(
+        Key={'PK': pk, 'SK': PROFILE_SK},
+        UpdateExpression=expression,
+        ExpressionAttributeNames=names,
+        ExpressionAttributeValues=values,
+    )
+
+    fresh = get_profile(pk)
+    return {"message": "User updated successfully", "user": parse_decimals(pick(fresh or {}, ADMIN_VIEW_FIELDS))}
+
+
+@app.post("/admin/users/{userId}/reset-password")
+def reset_user_password(userId: str, user: dict = Depends(require_roles('ADMIN'))):
+    pk = unquote(userId).strip()
+    if '#' not in pk:
+        raise HTTPException(status_code=400, detail="userId must be a full key such as CLIENT#CLS001")
+    if pk.startswith('ADMIN#'):
+        raise HTTPException(status_code=403, detail="Admin passwords cannot be reset from here.")
+
+    profile = get_profile(pk)
+    if not profile:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    temp_password = generate_temp_password()
+    table.update_item(
+        Key={'PK': pk, 'SK': PROFILE_SK},
+        UpdateExpression=(
+            "SET passwordHash = :p, mustChangePassword = :m, "
+            "pwdChangedAt = :t, failedAttempts = :z, lockedUntil = :z, updatedAt = :u, status = :s"
+        ),
+        ExpressionAttributeValues={
+            ':p': hash_password(temp_password),
+            ':m': True,
+            ':t': int(time.time()) + 1,
+            ':z': 0,
+            ':u': now_iso(),
+            ':s': 'ACTIVE',
+        },
+    )
+
+    return {
+        "message": "Temporary password generated. The user must change it at next sign-in.",
+        "userId": pk,
+        "userCode": short_id(pk),
+        "tempPassword": temp_password,
+    }
 
 
 @app.post("/admin/onboarding")
@@ -875,63 +1103,620 @@ def get_coach_clients(coachId: str, user: dict = Depends(require_roles('COACH', 
 
 
 @app.get("/coach/{coachId}/dashboard")
-def get_coach_dashboard(coachId: str, user: dict = Depends(require_roles('COACH', 'ADMIN'))):
+def get_coach_dashboard(
+    coachId: str,
+    user: dict = Depends(require_roles('COACH', 'ADMIN'))
+):
     coach_pk = make_pk('COACH', coachId)
+
     authorize_coach_scope(user, coach_pk)
+
     clients = coach_clients(coach_pk)
-    summaries = [(p, *summarize_client(p)) for p in clients]
+
+    summaries = [
+        (p, *summarize_client(p))
+        for p in clients
+    ]
+
+    # ---------------------------------------------------------
+    # Existing dashboard metrics
+    # ---------------------------------------------------------
 
     total = len(clients)
-    checked_in = sum(1 for _, _, m in summaries if m['days'] is not None and m['days'] <= 7)
-    active = sum(1 for p in clients if p.get('status', 'ACTIVE') != 'INACTIVE')
-    retention = f"{round(100 * active / total)}%" if total else '0%'
 
-    feed = sorted((s for s in summaries if s[2]['lastTs']), key=lambda s: s[2]['lastTs'], reverse=True)[:10]
+    checked_in = sum(
+        1
+        for _, _, meta in summaries
+        if meta['days'] is not None and meta['days'] <= 7
+    )
+
+    active = sum(
+        1
+        for profile in clients
+        if profile.get('status', 'ACTIVE') != 'INACTIVE'
+    )
+
+    retention = (
+        f"{round(100 * active / total)}%"
+        if total
+        else '0%'
+    )
+
+    # ---------------------------------------------------------
+    # Read recent client check-ins
+    #
+    # This uses the same existing latest_checkins() helper
+    # already used by summarize_client().
+    # ---------------------------------------------------------
+
+    all_checkins = []
+
+    for profile in clients:
+        client_checkins = latest_checkins(profile['PK'], 7)
+
+        for checkin in client_checkins:
+            all_checkins.append({
+                **checkin,
+                '_clientId': short_id(profile['PK']),
+                '_clientName': profile.get('name') or 'Unnamed Athlete',
+            })
+
+    # ---------------------------------------------------------
+    # Tracker: Workout Completion
+    # ---------------------------------------------------------
+
+    workout_values = [
+        item.get('workoutCompleted')
+        for item in all_checkins
+        if item.get('workoutCompleted') is not None
+    ]
+
+    workout_completion = (
+        round(
+            100
+            * sum(
+                1
+                for value in workout_values
+                if bool(value)
+            )
+            / len(workout_values)
+        )
+        if workout_values
+        else 0
+    )
+
+    # ---------------------------------------------------------
+    # Tracker: Sleep Consistency
+    #
+    # 7 hours = 100%.
+    # Values above 7 hours are capped at 100%.
+    # ---------------------------------------------------------
+
+    sleep_scores = []
+
+    for item in all_checkins:
+        value = item.get('sleepHours')
+
+        if value is None:
+            continue
+
+        try:
+            hours = float(value)
+
+            score = min(
+                hours / 7.0,
+                1.0
+            ) * 100
+
+            sleep_scores.append(score)
+
+        except (TypeError, ValueError):
+            continue
+
+    sleep_consistency = (
+        round(sum(sleep_scores) / len(sleep_scores))
+        if sleep_scores
+        else 0
+    )
+
+    # ---------------------------------------------------------
+    # Tracker: Hydration
+    #
+    # 2.5L = 100%.
+    # ---------------------------------------------------------
+
+    hydration_scores = []
+
+    for item in all_checkins:
+        value = item.get('hydrationLiters')
+
+        if value is None:
+            continue
+
+        try:
+            liters = float(value)
+
+            score = min(
+                liters / 2.5,
+                1.0
+            ) * 100
+
+            hydration_scores.append(score)
+
+        except (TypeError, ValueError):
+            continue
+
+    hydration = (
+        round(sum(hydration_scores) / len(hydration_scores))
+        if hydration_scores
+        else 0
+    )
+
+    # ---------------------------------------------------------
+    # Tracker: Adherence
+    #
+    # We use the existing adherence_score() helper so the
+    # backend keeps one definition of adherence.
+    # ---------------------------------------------------------
+
+    adherence_scores = []
+
+    for item in all_checkins:
+        score = adherence_score(
+            item.get('adherence')
+        )
+
+        if score is not None:
+            adherence_scores.append(score)
+
+    adherence = (
+        round(
+            sum(adherence_scores)
+            / len(adherence_scores)
+        )
+        if adherence_scores
+        else 0
+    )
+
+    # ---------------------------------------------------------
+    # Tracker: Steps
+    #
+    # 8,000 steps = 100%.
+    # ---------------------------------------------------------
+
+    step_scores = []
+
+    for item in all_checkins:
+        value = item.get('steps')
+
+        if value is None:
+            continue
+
+        try:
+            steps = float(value)
+
+            score = min(
+                steps / 8000.0,
+                1.0
+            ) * 100
+
+            step_scores.append(score)
+
+        except (TypeError, ValueError):
+            continue
+
+    steps = (
+        round(sum(step_scores) / len(step_scores))
+        if step_scores
+        else 0
+    )
+
+    # ---------------------------------------------------------
+    # Recent activity feed
+    # ---------------------------------------------------------
+
+    feed = sorted(
+        (
+            summary
+            for summary in summaries
+            if summary[2]['lastTs']
+        ),
+        key=lambda summary: summary[2]['lastTs'],
+        reverse=True
+    )[:10]
+
     activity = []
+
     for _profile, row, meta in feed:
-        weight = f" • {parse_decimals(meta['weight'])} kg" if meta['weight'] is not None else ''
+
+        weight = (
+            f" • {parse_decimals(meta['weight'])} kg"
+            if meta['weight'] is not None
+            else ''
+        )
+
         activity.append({
             "id": row['id'],
             "client": row['name'],
-            "action": f"Submitted weekly check-in{weight}",
-            "status": 'completed' if (meta['latestScore'] or 0) >= 75 else 'alert',
+            "action": (
+                f"Submitted weekly check-in{weight}"
+            ),
+            "status": (
+                'completed'
+                if (meta['latestScore'] or 0) >= 75
+                else 'alert'
+            ),
             "time": time_ago(meta['lastTs']),
         })
 
+    # ---------------------------------------------------------
+    # Final response
+    # ---------------------------------------------------------
+
     return {
         "stats": [
-            {"label": 'Active Clients', "value": str(total), "icon": 'Users', "glowColor": '#4facfe'},
-            {"label": 'Weekly Check-ins', "value": f"{checked_in}/{total}", "icon": 'CheckCircle2', "glowColor": '#E5B869'},
-            {"label": 'Client Retention', "value": retention, "icon": 'TrendingUp', "glowColor": '#00E27B'},
+
+            # Existing metrics
+            {
+                "label": "Active Clients",
+                "name": "Active Clients",
+                "value": str(total),
+                "icon": "Users",
+                "glowColor": "#4facfe",
+            },
+
+            {
+                "label": "Weekly Check-ins",
+                "name": "Weekly Check-ins",
+                "value": f"{checked_in}/{total}",
+                "icon": "CheckCircle2",
+                "glowColor": "#E5B869",
+            },
+
+            {
+                "label": "Client Retention",
+                "name": "Client Retention",
+                "value": retention,
+                "icon": "TrendingUp",
+                "glowColor": "#00E27B",
+            },
+
+            # Tracker metrics
+            {
+                "label": "Workout Completion",
+                "name": "Workout Completion",
+                "value": workout_completion,
+                "icon": "Dumbbell",
+                "glowColor": "#5B8CFF",
+            },
+
+            {
+                "label": "Sleep Consistency",
+                "name": "Sleep Consistency",
+                "value": sleep_consistency,
+                "icon": "Moon",
+                "glowColor": "#8B7CFF",
+            },
+
+            {
+                "label": "Hydration",
+                "name": "Hydration",
+                "value": hydration,
+                "icon": "Droplets",
+                "glowColor": "#55B7FF",
+            },
+
+            {
+                "label": "Adherence",
+                "name": "Adherence",
+                "value": adherence,
+                "icon": "Activity",
+                "glowColor": "#62C7A5",
+            },
+
+            {
+                "label": "Steps",
+                "name": "Steps",
+                "value": steps,
+                "icon": "Footprints",
+                "glowColor": "#A08CFF",
+            },
         ],
+
         "recentActivity": activity,
     }
 
+# -------------------------- client check status ----------------------------
+@app.get("/athlete/{athleteId}/check-status")
+def get_athlete_check_status(athleteId: str, user: dict = Depends(require_roles('CLIENT'))):
+    client_pk = make_pk('CLIENT', athleteId)
+    authorize_athlete_scope(user, client_pk)
+    return parse_decimals(three_day_status(client_pk))
+
+
+@app.put("/athlete/check-status/3-day-log/{day}")
+def save_three_day_log(day: int, payload: ThreeDayLogPayload, user: dict = Depends(require_roles('CLIENT'))):
+    client_pk = user['pk']
+    validate_three_day_day(day)
+    cleaned_meals: Dict[str, str] = {}
+    for meal, value in payload.meals.items():
+        valid_meal = validate_three_day_meal(meal)
+        cleaned_meals[valid_meal] = clean_text(value, 2000) or ''
+
+    ts = now_iso()
+    table.put_item(Item=to_dynamo({
+        'PK': client_pk,
+        'SK': f'3DAYLOG#DAY{day}',
+        'type': 'THREE_DAY_LOG',
+        'day': day,
+        'meals': cleaned_meals,
+        'updatedAt': ts,
+        'createdAt': ts,
+    }))
+    status = three_day_status(client_pk)['days'][day - 1]['status']
+    return {'message': '3-day log saved', 'day': day, 'status': status}
+
+
+@app.post("/athlete/check-status/photos/upload-url")
+def create_three_day_photo_upload(payload: ThreeDayPhotoUploadPayload, user: dict = Depends(require_roles('CLIENT'))):
+    client_pk = user['pk']
+    validate_three_day_day(payload.day)
+    meal = validate_three_day_meal(payload.meal)
+    if not CLIENT_MEDIA_BUCKET:
+        raise HTTPException(status_code=503, detail='Photo storage is not configured.')
+    if payload.contentType not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail='Unsupported image type.')
+
+    original_name = clean_text(payload.fileName, 180) or 'photo'
+    ext = ALLOWED_IMAGE_TYPES[payload.contentType]
+    object_key = (
+        f"clients/{short_id(client_pk)}/3-day-log/"
+        f"day-{payload.day}/{meal.lower()}-{uuid.uuid4().hex}{ext}"
+    )
+
+    try:
+        post = s3.generate_presigned_post(
+            Bucket=CLIENT_MEDIA_BUCKET,
+            Key=object_key,
+            Fields={'Content-Type': payload.contentType},
+            Conditions=[
+                {'Content-Type': payload.contentType},
+                ['content-length-range', 1, MAX_CLIENT_PHOTO_BYTES],
+                ['starts-with', '$key', f'clients/{short_id(client_pk)}/3-day-log/day-{payload.day}/{meal.lower()}-'],
+            ],
+            ExpiresIn=300,
+        )
+    except ClientError:
+        raise HTTPException(status_code=503, detail='Unable to prepare photo upload.')
+
+    # Store no secret or URL in DynamoDB until the upload is confirmed.
+    return {
+        'uploadUrl': post['url'],
+        'fields': post['fields'],
+        'objectKey': object_key,
+        'expiresIn': 300,
+        'fileName': original_name,
+    }
+
+
+@app.post("/athlete/check-status/photos/complete")
+def complete_three_day_photo(payload: ThreeDayPhotoCompletePayload, user: dict = Depends(require_roles('CLIENT'))):
+    client_pk = user['pk']
+    validate_three_day_day(payload.day)
+    meal = validate_three_day_meal(payload.meal)
+    if not CLIENT_MEDIA_BUCKET:
+        raise HTTPException(status_code=503, detail='Photo storage is not configured.')
+
+    prefix = f"clients/{short_id(client_pk)}/3-day-log/day-{payload.day}/{meal.lower()}-"
+    if not payload.objectKey.startswith(prefix):
+        raise HTTPException(status_code=403, detail='You do not have access to this upload.')
+
+    try:
+        head = s3.head_object(Bucket=CLIENT_MEDIA_BUCKET, Key=payload.objectKey)
+    except ClientError:
+        raise HTTPException(status_code=400, detail='Uploaded photo could not be verified.')
+
+    content_type = head.get('ContentType', '')
+    size = int(head.get('ContentLength', 0))
+    if content_type not in ALLOWED_IMAGE_TYPES or size <= 0 or size > MAX_CLIENT_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail='Uploaded photo failed validation.')
+
+    ts = now_iso()
+    item = to_dynamo({
+        'PK': client_pk,
+        'SK': f'3DAYPHOTO#DAY{payload.day}#{meal.upper()}',
+        'type': 'THREE_DAY_PHOTO',
+        'day': payload.day,
+        'meal': meal,
+        'objectKey': payload.objectKey,
+        'contentType': content_type,
+        'size': size,
+        'originalFileName': clean_text(payload.originalFileName, 180) or payload.objectKey.rsplit('/', 1)[-1],
+        'uploadedAt': ts,
+        'createdAt': ts,
+    })
+    table.put_item(Item=item)
+
+    return {
+        'message': 'Photo saved',
+        'photo': {
+            'id': item['SK'],
+            'day': payload.day,
+            'meal': meal,
+            'originalFileName': item['originalFileName'],
+            'contentType': content_type,
+            'uploadedAt': ts,
+        },
+    }
+
+
+@app.get("/coach/{coachId}/clients/{clientId}/check-status")
+def get_coach_client_check_status(coachId: str, clientId: str, user: dict = Depends(require_roles('COACH'))):
+    coach_pk = make_pk('COACH', coachId)
+    client_pk = make_pk('CLIENT', clientId)
+    authorize_coach_scope(user, coach_pk)
+    client = get_profile(client_pk)
+    if not client or client.get('role') != 'CLIENT':
+        raise HTTPException(status_code=404, detail='Client not found.')
+    if user['role'] == 'COACH' and client.get('coachId') not in (user['pk'], short_id(user['pk'])):
+        raise HTTPException(status_code=403, detail='You do not have access to this resource.')
+    return parse_decimals(three_day_status(client_pk))
+
 
 # ------------------------------- athlete -----------------------------------
+def _checkin_date(item: dict) -> Optional[str]:
+    value = item.get('createdAt') or item.get('updatedAt')
+    if value:
+        dt = parse_iso(str(value))
+        if dt:
+            return dt.astimezone(timezone.utc).date().isoformat()
+    sk = str(item.get('SK', ''))
+    match = re.search(r'(\d{4}-\d{2}-\d{2})', sk)
+    return match.group(1) if match else None
+
+
+def _progress_range(range_key: str, end_date: str) -> tuple[str, str]:
+    try:
+        end = datetime.strptime(end_date, '%Y-%m-%d').date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail='Invalid date. Use YYYY-MM-DD.')
+
+    days = {
+        'today': 1,
+        '7d': 7,
+        '30d': 30,
+        '3m': 90,
+        '1y': 365,
+    }.get(range_key)
+    if days is None:
+        raise HTTPException(status_code=400, detail='Invalid range. Use today, 7d, 30d, 3m, or 1y.')
+    from datetime import timedelta
+    start = end - timedelta(days=days - 1)
+    return start.isoformat(), end.isoformat()
+
+
+def _progress_point(date_key: str, checkins: list[dict], training: list[dict]) -> dict:
+    latest = sorted(
+        [c for c in checkins if _checkin_date(c) == date_key],
+        key=lambda c: str(c.get('createdAt') or c.get('updatedAt') or ''),
+        reverse=True,
+    )
+    completed_training = [t for t in training if t.get('completed') is True or str(t.get('statusText', '')).lower() == 'completed']
+    workout_values = [t for t in training if t.get('completed') is not None or 'statusText' in t]
+    row = {
+        'date': date_key,
+        'steps': None,
+        'sleepHours': None,
+        'hydration': None,
+        'weight': None,
+        'adherence': None,
+        'workoutCompletion': None,
+        'workoutsCompleted': len(completed_training),
+    }
+    if latest:
+        item = latest[0]
+        if item.get('steps') is not None: row['steps'] = float(item['steps'])
+        if item.get('sleepHours') is not None: row['sleepHours'] = float(item['sleepHours'])
+        if item.get('hydrationLiters') is not None: row['hydration'] = float(item['hydrationLiters'])
+        if item.get('weight') is not None: row['weight'] = float(item['weight'])
+        row['adherence'] = adherence_score(item.get('adherence'))
+        if item.get('workoutCompleted') is not None:
+            row['workoutCompletion'] = 100 if bool(item.get('workoutCompleted')) else 0
+    if workout_values:
+        row['workoutCompletion'] = round(100 * len(completed_training) / len(workout_values))
+    return parse_decimals(row)
+
+
 @app.get("/athlete/{athleteId}/dashboard")
 def get_athlete_dashboard(athleteId: str, date: Optional[str] = None, user: dict = Depends(current_user)):
-    """Today's training. The browser passes its LOCAL date (?date=YYYY-MM-DD) so the
-    'today' a user in India sees is not shifted by the server running in UTC."""
+    """Daily athlete snapshot. The browser passes its LOCAL date (?date=YYYY-MM-DD)."""
     client_pk = make_pk('CLIENT', athleteId)
     authorize_athlete_scope(user, client_pk)
     day = date if date and re.match(r'^\d{4}-\d{2}-\d{2}$', date) else datetime.now(timezone.utc).strftime('%Y-%m-%d')
-    items = query_all(
-        KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with(f"TRAINING#{day}")
-    )
+    training = query_all(KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with(f"TRAINING#{day}"))
+    checkins = query_all(KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with('CHECKIN#'))
+    point = _progress_point(day, checkins, training)
+    from datetime import timedelta
+    today_date = datetime.strptime(day, '%Y-%m-%d').date()
+    week_start = today_date - timedelta(days=6)
+    recent_checkins = [c for c in checkins if (_checkin_date(c) and week_start.isoformat() <= _checkin_date(c) <= day)]
+    completed_week = sum(1 for c in recent_checkins if c.get('workoutCompleted') is True)
+    workout_records = sum(1 for c in recent_checkins if c.get('workoutCompleted') is not None)
+    workouts_this_week = completed_week if workout_records else None
     return {
-        "date": day,
-        "todayTraining": [
+        'date': day,
+        'todayTraining': [
             {
-                "id": i['SK'],
-                "title": i.get('title', ''),
-                "subtitle": i.get('subtitle', ''),
-                "statusText": i.get('statusText', 'pending'),
-                "statusColor": i.get('statusColor', 'gold'),
+                'id': i['SK'],
+                'title': i.get('title', ''),
+                'subtitle': i.get('subtitle', ''),
+                'statusText': i.get('statusText', 'pending'),
+                'statusColor': i.get('statusColor', 'gold'),
             }
-            for i in items
+            for i in training
         ],
+        'steps': point['steps'],
+        'stepGoal': 8000,
+        'sleepHours': point['sleepHours'],
+        'sleepGoal': 7,
+        'hydration': point['hydration'],
+        'hydrationGoal': 2.5,
+        'workoutCompletion': point['workoutCompletion'],
+        'workoutsThisWeek': workouts_this_week,
+        'recovery': None,
+        'calories': None,
     }
+
+
+@app.get("/athlete/{athleteId}/progress")
+def get_athlete_progress(athleteId: str, range: str = '7d', to: Optional[str] = None, user: dict = Depends(current_user)):
+    """Historical athlete progress derived from stored check-ins and training records."""
+    client_pk = make_pk('CLIENT', athleteId)
+    authorize_athlete_scope(user, client_pk)
+    end_date = to if to and re.match(r'^\d{4}-\d{2}-\d{2}$', to) else datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    start_date, end_date = _progress_range(range, end_date)
+
+    checkins = query_all(KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with('CHECKIN#'))
+    training = query_all(KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with('TRAINING#'))
+
+    from datetime import timedelta
+    start = datetime.strptime(start_date, '%Y-%m-%d').date()
+    end = datetime.strptime(end_date, '%Y-%m-%d').date()
+    training_by_day = {}
+    for item in training:
+        match = re.search(r'(\d{4}-\d{2}-\d{2})', str(item.get('SK', '')))
+        if match:
+            training_by_day.setdefault(match.group(1), []).append(item)
+
+    points = []
+    cursor = start
+    while cursor <= end:
+        day_key = cursor.isoformat()
+        points.append(_progress_point(day_key, checkins, training_by_day.get(day_key, [])))
+        cursor += timedelta(days=1)
+
+    numeric = lambda key: [float(p[key]) for p in points if p.get(key) is not None]
+    def avg(key):
+        values = numeric(key)
+        return round(sum(values) / len(values), 1) if values else None
+    workouts_total = sum(int(p.get('workoutsCompleted') or 0) for p in points)
+    workout_days = [p['workoutCompletion'] for p in points if p.get('workoutCompletion') is not None]
+
+    return parse_decimals({
+        'range': range,
+        'from': start_date,
+        'to': end_date,
+        'summary': {
+            'averageSteps': avg('steps'),
+            'averageSleepHours': avg('sleepHours'),
+            'averageHydration': avg('hydration'),
+            'averageWeight': avg('weight'),
+            'averageAdherence': avg('adherence'),
+            'workoutCompletion': round(sum(workout_days) / len(workout_days)) if workout_days else None,
+            'workoutsCompleted': workouts_total,
+        },
+        'daily': points,
+    })
 
 
 @app.post("/athlete/checkin")

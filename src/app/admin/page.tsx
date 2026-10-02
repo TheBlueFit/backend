@@ -1,6 +1,6 @@
 // "use client";
 // import React, { useState, useEffect } from 'react';
-// import { Shield, Users, Activity, Database, Plus, Edit2, Trash2, Key, PieChart, Utensils } from 'lucide-react';
+// import { Shield, Users, Activity, Database, Plus, Edit2, Trash2, Key, PieChart, Utensils, X, Save, RefreshCw } from 'lucide-react';
 // import Link from 'next/link';
 
 // export default function AdminDashboard() {
@@ -284,7 +284,7 @@
 
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Shield, Users, Activity, Database, Plus, Edit2, Trash2, Key, PieChart, Utensils } from 'lucide-react';
+import { Shield, Users, Activity, Database, Plus, Edit2, Trash2, Key, PieChart, Utensils, X, Save, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { dashboardAPI } from '@/services/api';
 
@@ -294,7 +294,12 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   
-  // NEW: State for the right-side glassmorphism drawer
+
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState<any>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [resetResult, setResetResult] = useState<{ userCode: string; tempPassword: string } | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
 
   // Fetch live users from DynamoDB on mount
   useEffect(() => {
@@ -348,6 +353,51 @@ export default function AdminDashboard() {
   };
 
   const coaches = dbUsers.filter(u => u.role === 'COACH');
+
+  const openEditUser = (user: any) => {
+    setEditingUser(user);
+    setResetResult(null);
+    setEditForm({
+      name: user.name || '',
+      email: user.email || '',
+      status: user.status || 'ACTIVE',
+    });
+  };
+
+  const handleSaveUser = async () => {
+    if (!editingUser) return;
+    try {
+      setIsSaving(true);
+      const payload = {
+        ...editForm,
+        age: editForm.age === '' ? undefined : Number(editForm.age),
+        height: editForm.height === '' ? undefined : Number(editForm.height),
+        weight: editForm.weight === '' ? undefined : Number(editForm.weight),
+      };
+      const result = await dashboardAPI.updateUser(editingUser.PK, payload);
+      setDbUsers(prev => prev.map(u => u.PK === editingUser.PK ? { ...u, ...result.user } : u));
+      setEditingUser(null);
+    } catch (error: any) {
+      alert(error?.message || 'Failed to update user.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleResetPassword = async (user: any) => {
+    if (!confirm(`Generate a new temporary password for ${user.name || user.PK}?`)) return;
+    try {
+      setIsResetting(true);
+      setResetResult(null);
+      const result = await dashboardAPI.resetUserPassword(user.PK);
+      setResetResult({ userCode: result.userCode, tempPassword: result.tempPassword });
+      setDbUsers(prev => prev.map(u => u.PK === user.PK ? { ...u, mustChangePassword: true, status: 'ACTIVE' } : u));
+    } catch (error: any) {
+      alert(error?.message || 'Failed to reset password.');
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   const stats = [
     { label: 'Total Users', value: dbUsers.length.toString(), icon: Users, glowColor: 'var(--text-primary)' },
@@ -470,10 +520,19 @@ export default function AdminDashboard() {
                           </select>
                         )}
 
-                        <button style={{ background: 'rgba(0, 122, 255, 0.1)', border: '1px solid rgba(0, 122, 255, 0.3)', color: '#60A5FA', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} title="Manage Access Level">
-                          <Key size={14} />
+                        <button
+                          onClick={() => handleResetPassword(user)}
+                          disabled={isResetting || user.role === 'ADMIN'}
+                          style={{ background: 'rgba(0, 122, 255, 0.1)', border: '1px solid rgba(0, 122, 255, 0.3)', color: '#60A5FA', padding: '8px', borderRadius: '8px', cursor: user.role === 'ADMIN' ? 'not-allowed' : 'pointer', opacity: user.role === 'ADMIN' ? 0.45 : 1 }}
+                          title="Generate temporary password"
+                        >
+                          {isResetting ? <RefreshCw size={14} className="animate-spin" /> : <Key size={14} />}
                         </button>
-                        <button style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} title="Edit User">
+                        <button
+                          onClick={() => openEditUser(user)}
+                          style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '8px', borderRadius: '8px', cursor: 'pointer' }}
+                          title="Edit User"
+                        >
                           <Edit2 size={14} />
                         </button>
 
@@ -531,6 +590,63 @@ export default function AdminDashboard() {
 
         </div>
       </div>
+
+      {resetResult && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.62)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="app-card" style={{ width: 'min(460px, 100%)', padding: '26px' }}>
+            <div className="section-header" style={{ justifyContent: 'space-between', marginBottom: '18px' }}>
+              <div>
+                <div className="label-text" style={{ color: 'var(--accent-gold)' }}>PASSWORD RESET</div>
+                <h3 style={{ marginTop: '6px' }}>Temporary password generated</h3>
+              </div>
+              <button onClick={() => setResetResult(null)} style={{ background: 'transparent', border: 0, color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.6 }}>Give this password to the user securely. It will only be shown here now, and the user must replace it at their next sign-in.</p>
+            <div style={{ marginTop: '18px', padding: '16px', borderRadius: '12px', background: 'rgba(229,184,105,0.08)', border: '1px solid rgba(229,184,105,0.25)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>USER</div>
+              <strong>{resetResult.userCode}</strong>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '14px', marginBottom: '6px' }}>TEMPORARY PASSWORD</div>
+              <code style={{ fontSize: '20px', letterSpacing: '0.08em', color: 'var(--accent-gold)' }}>{resetResult.tempPassword}</code>
+            </div>
+            <button className="btn-primary" onClick={() => setResetResult(null)} style={{ marginTop: '18px', width: '100%' }}>Done</button>
+          </div>
+        </div>
+      )}
+
+      {editingUser && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,0.62)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="app-card" style={{ width: 'min(620px, 100%)', maxHeight: '90vh', overflowY: 'auto', padding: '26px' }}>
+            <div className="section-header" style={{ justifyContent: 'space-between', marginBottom: '20px' }}>
+              <div>
+                <div className="label-text" style={{ color: 'var(--accent-gold)' }}>USER MANAGEMENT</div>
+                <h3 style={{ marginTop: '6px' }}>Edit {editingUser.name || editingUser.userCode}</h3>
+              </div>
+              <button onClick={() => setEditingUser(null)} style={{ background: 'transparent', border: 0, color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              {['name', 'email'].map(key => (
+                <label key={key} style={{ display: 'grid', gap: '6px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{key}</span>
+                  <input value={editForm[key] ?? ''} onChange={e => setEditForm({ ...editForm, [key]: e.target.value })} style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: '9px' }} />
+                </label>
+              ))}
+              <label style={{ display: 'grid', gap: '6px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>STATUS</span>
+                <select value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value })} style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: '9px' }}>
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="INACTIVE">INACTIVE</option>
+                </select>
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '22px' }}>
+              <button className="btn-secondary" onClick={() => setEditingUser(null)}>Cancel</button>
+              <button className="btn-primary" onClick={handleSaveUser} disabled={isSaving} style={{ display: 'flex', alignItems: 'center', gap: '7px' }}><Save size={15} /> {isSaving ? 'Saving...' : 'Save changes'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

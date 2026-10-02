@@ -1,115 +1,4 @@
 // ---------------------------------------------------------------------------
-// Centralized API service.
-//
-// UI-FIRST MODE
-//   - Every call below has a matching MOCK (same JSON shape the FastAPI backend
-//     will return), so every screen renders without a backend.
-//   - Mock data is used when:
-//       1. NEXT_PUBLIC_USE_MOCK=true  (force mocks, never touches the network), or
-//       2. a request fails while running `next dev` (logged with console.warn).
-//   - In a production build the fallback is OFF: real errors surface to the UI.
-//
-// CONNECTING THE BACKEND LATER
-//   Set NEXT_PUBLIC_API_URL, leave NEXT_PUBLIC_USE_MOCK unset, and each method
-//   starts returning live data. No page code needs to change.
-// ---------------------------------------------------------------------------
-// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
-// const FORCE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
-// const DEV_FALLBACK = process.env.NODE_ENV !== 'production';
-
-// async function request<T>(path: string, mock: T, init?: RequestInit): Promise<T> {
-//   if (FORCE_MOCK) return mock;
-//   try {
-//     const res = await fetch(`${API_BASE_URL}${path}`, init);
-//     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-//     return (await res.json()) as T;
-//   } catch (err) {
-//     if (!DEV_FALLBACK) throw err;
-//     console.warn(`[api] ${path} unavailable (${String(err)}) - showing mock data`);
-//     return mock;
-//   }
-// }
-
-// // ----------------------------- MOCK DATA -----------------------------------
-// const MOCK_ATHLETE = {
-//   todayTraining: [
-//     { id: 1, title: 'Upper Body Strength', subtitle: '5 exercises • 55 min', statusText: 'completed', statusColor: 'green' },
-//     { id: 2, title: 'Zone 2 Cardio', subtitle: '30 min • easy pace', statusText: 'pending', statusColor: 'gold' },
-//     { id: 3, title: 'Core & Mobility', subtitle: 'McGill Big 3 • 15 min', statusText: 'upcoming', statusColor: 'gold' },
-//   ],
-// };
-
-// const MOCK_COACH = {
-//   stats: [
-//     { label: 'Active Clients', value: '12' },
-//     { label: 'Check-ins Due', value: '3' },
-//     { label: 'Avg Adherence', value: '87%' },
-//   ],
-//   recentActivity: [
-//     { id: 1, client: 'Sandy Kumar', action: 'Completed Upper Body Strength', status: 'completed' },
-//     { id: 2, client: 'Hemanth Rao', action: 'Submitted weekly check-in', status: 'completed' },
-//     { id: 3, client: 'Rakesh S.', action: 'Missed Tuesday leg session', status: 'missed' },
-//     { id: 4, client: 'Manoj Reddy', action: 'Hit all macro targets', status: 'completed' },
-//   ],
-// };
-
-// const MOCK_TEMPLATES = {
-//   templates: [
-//     { id: 'tpl-1', title: 'Hypertrophy Push / Pull / Legs', description: 'Six-day split focused on progressive overload and volume.', activities: '18 activities', workoutDays: '6 days / week', goal: 'Muscle gain' },
-//     { id: 'tpl-2', title: 'Fat-Loss Full Body', description: 'Three full-body sessions plus low-intensity cardio.', activities: '12 activities', workoutDays: '3 days / week', goal: 'Fat loss' },
-//     { id: 'tpl-3', title: 'Strength Base (5x5)', description: 'Linear progression on the main barbell lifts.', activities: '9 activities', workoutDays: '3 days / week', goal: 'Strength' },
-//   ],
-// };
-
-// export type CoachClient = {
-//   id: string;
-//   name: string;
-//   goal: string;
-//   adherence: number;
-//   lastCheckIn: string;
-//   status: 'on-track' | 'needs-attention';
-// };
-
-// const MOCK_CLIENTS: { clients: CoachClient[] } = {
-//   clients: [
-//     { id: 'c-1001', name: 'Sandy Kumar', goal: 'Fat loss', adherence: 92, lastCheckIn: 'Today', status: 'on-track' },
-//     { id: 'c-1002', name: 'Hemanth Rao', goal: 'Muscle gain', adherence: 88, lastCheckIn: 'Yesterday', status: 'on-track' },
-//     { id: 'c-1003', name: 'Rakesh S.', goal: 'Strength', adherence: 61, lastCheckIn: '6 days ago', status: 'needs-attention' },
-//     { id: 'c-1004', name: 'Manoj Reddy', goal: 'Fat loss', adherence: 95, lastCheckIn: 'Today', status: 'on-track' },
-//     { id: 'c-1005', name: 'Suresh Babu', goal: 'Recomposition', adherence: 54, lastCheckIn: '9 days ago', status: 'needs-attention' },
-//     { id: 'c-1006', name: 'Priya Nair', goal: 'Muscle gain', adherence: 83, lastCheckIn: '2 days ago', status: 'on-track' },
-//   ],
-// };
-
-// const MOCK_ADMIN = { users: 12, coaches: 9, health: '99.9%' };
-
-// // ------------------------------ ENDPOINTS ----------------------------------
-// export const dashboardAPI = {
-//   // GET /athlete/{athleteId}/dashboard
-//   getAthleteData: (athleteId: string) =>
-//     request(`/athlete/${athleteId}/dashboard`, MOCK_ATHLETE),
-
-//   // GET /coach/{coachId}/dashboard
-//   getCoachData: (coachId: string) =>
-//     request(`/coach/${coachId}/dashboard`, MOCK_COACH),
-
-//   // GET /admin/system-status
-//   getAdminData: () =>
-//     request('/admin/system-status', MOCK_ADMIN),
-
-//   // GET /coach/{coachId}/templates
-//   getCoachTemplates: (coachId: string) =>
-//     request(`/coach/${coachId}/templates`, MOCK_TEMPLATES),
-
-//   // GET /coach/{coachId}/clients
-//   getCoachClients: (coachId: string) =>
-//     request(`/coach/${coachId}/clients`, MOCK_CLIENTS),
-// };
-
-// =============================================================
-
-
-// ---------------------------------------------------------------------------
 // ACTIVE API LAYER
 //  - The API address comes ONLY from NEXT_PUBLIC_API_URL (no address in source code).
 //  - After sign-in, every request carries the session token as "Authorization: Bearer ...".
@@ -206,6 +95,86 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   return res.json();
 }
 
+export interface AthleteDashboardData {
+  date: string;
+  todayTraining: any[];
+  steps?: number;
+  stepGoal?: number;
+  sleepHours?: number;
+  sleepGoal?: number;
+  hydration?: number;
+  hydrationGoal?: number;
+  workoutCompletion?: number;
+  recovery?: number;
+  calories?: number;
+  workoutsThisWeek?: number;
+}
+
+export type AthleteProgressRange = 'today' | '7d' | '30d' | '3m' | '1y';
+
+export interface AthleteProgressPoint {
+  date: string;
+  steps?: number | null;
+  sleepHours?: number | null;
+  hydration?: number | null;
+  weight?: number | null;
+  adherence?: number | null;
+  workoutCompletion?: number | null;
+  workoutsCompleted: number;
+}
+
+export interface AthleteProgressData {
+  range: AthleteProgressRange;
+  from: string;
+  to: string;
+  summary: {
+    averageSteps?: number | null;
+    averageSleepHours?: number | null;
+    averageHydration?: number | null;
+    averageWeight?: number | null;
+    averageAdherence?: number | null;
+    workoutCompletion?: number | null;
+    workoutsCompleted: number;
+  };
+  daily: AthleteProgressPoint[];
+}
+
+export interface ThreeDayPhoto {
+  id: string;
+  day: number;
+  meal: string;
+  originalFileName: string;
+  contentType: string;
+  uploadedAt: string;
+  viewUrl?: string;
+}
+
+export interface ThreeDayDayStatus {
+  day: number;
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETE';
+  meals: Record<string, string>;
+  photos: ThreeDayPhoto[];
+}
+
+export interface ThreeDayCheckStatus {
+  onboardingCompleted: boolean;
+  overallStatus: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETE';
+  days: ThreeDayDayStatus[];
+}
+
+export interface ThreeDayPhotoUpload {
+  uploadUrl: string;
+  fields: Record<string, string>;
+  objectKey: string;
+  expiresIn: number;
+}
+
+export interface ThreeDayLogResponse {
+  message: string;
+  day: number;
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETE';
+}
+
 export const dashboardAPI = {
   // --- AUTH & FIRST-TIME SETUP ---
   login: async (role: 'CLIENT' | 'COACH' | 'ADMIN', identifier: string, password: string) => {
@@ -257,6 +226,27 @@ export const dashboardAPI = {
     apiFetch<{ message: string }>(`/admin/users/${encodeURIComponent(userId)}`, {
       method: 'DELETE',
     }),
+  updateUser: (userId: string, payload: {
+    name?: string;
+    email?: string;
+    status?: 'ACTIVE' | 'INACTIVE';
+    age?: number;
+    height?: number;
+    weight?: number;
+    activityLevel?: string;
+    primaryGoal?: string;
+    medicalNotes?: string;
+    specialization?: string;
+  }) =>
+    apiFetch<{ message: string; user: any }>(`/admin/users/${encodeURIComponent(userId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  resetUserPassword: (userId: string) =>
+    apiFetch<{ message: string; userId: string; userCode: string; tempPassword: string }>(
+      `/admin/users/${encodeURIComponent(userId)}/reset-password`,
+      { method: 'POST' }
+    ),
   assignCoach: (clientId: string, coachId: string) =>
     apiFetch<{ message: string; updated: any }>(
       `/admin/users/${encodeURIComponent(clientId)}/assign`,
@@ -294,9 +284,64 @@ export const dashboardAPI = {
 
   // --- ATHLETE (CLIENT) ---
   getAthleteData: (_athleteId?: string, date?: string) =>
-    apiFetch<{ date: string; todayTraining: any[] }>(
+    apiFetch<AthleteDashboardData>(
       `/athlete/${encodeURIComponent(sessionId())}/dashboard?date=${encodeURIComponent(date || getLocalDateISO())}`
     ),
+
+  getAthleteProgress: (range: AthleteProgressRange, to?: string) =>
+    apiFetch<AthleteProgressData>(
+      `/athlete/${encodeURIComponent(sessionId())}/progress?range=${encodeURIComponent(range)}&to=${encodeURIComponent(to || getLocalDateISO())}`
+    ),
+
+  // 3-Day onboarding / check-status
+  getClientCheckStatus: () =>
+    apiFetch<ThreeDayCheckStatus>(
+      `/athlete/${encodeURIComponent(sessionId())}/check-status`
+    ),
+
+  saveThreeDayLog: (day: number, meals: Record<string, string>) =>
+    apiFetch<ThreeDayLogResponse>(
+      `/athlete/check-status/3-day-log/${day}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ meals }),
+      }
+    ),
+
+  createThreeDayPhotoUpload: (payload: {
+    day: number;
+    meal: string;
+    fileName: string;
+    contentType: string;
+  }) =>
+    apiFetch<ThreeDayPhotoUpload>(
+      '/athlete/check-status/photos/upload-url',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }
+    ),
+
+  completeThreeDayPhoto: (payload: {
+    day: number;
+    meal: string;
+    objectKey: string;
+    originalFileName?: string;
+  }) =>
+    apiFetch<{ message: string; photo: ThreeDayPhoto }>(
+      '/athlete/check-status/photos/complete',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }
+    ),
+
+  // --- COACH: signed-in coach may view only assigned clients ---
+  getCoachClientCheckStatus: (clientId: string) =>
+    apiFetch<ThreeDayCheckStatus>(
+      `/coach/${encodeURIComponent(sessionId())}/clients/${encodeURIComponent(clientId)}/check-status`
+    ),
+
   saveCheckin: (payload: {
     weight: number;
     adherence: string;

@@ -13,7 +13,7 @@ export default function CoachClientRoster() {
   useEffect(() => {
     const fetchClients = async () => {
       try {
-        const data = await dashboardAPI.getCoachClients('coach-123');
+        const data = await dashboardAPI.getCoachClients();
         setClients(data.clients);
       } catch (error) {
         console.error('Failed to fetch clients:', error);

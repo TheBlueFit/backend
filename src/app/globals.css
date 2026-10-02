@@ -1409,3 +1409,1639 @@ body {
     overflow-wrap: anywhere;
   }
 }
+
+/* =========================================
+   UNIFIED BLUE FIT NAVIGATION
+   One hamburger -> one portal navigation drawer.
+   The former right-side navigation is intentionally disabled.
+   ========================================= */
+
+.nav-fab-right,
+.subnav-stack {
+  display: none !important;
+}
+
+.unified-sidebar {
+  padding: calc(max(16px, env(safe-area-inset-top)) + 64px) 18px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.unified-sidebar-header {
+  margin-bottom: 24px;
+  padding: 0 6px;
+}
+
+.unified-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.unified-nav-item {
+  display: flex !important;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: rgba(14, 14, 18, 0.62);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: rgba(255, 255, 255, 0.82) !important;
+  text-decoration: none !important;
+  font-size: 14px !important;
+  font-weight: 500;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.unified-nav-item:hover {
+  border-color: rgba(229, 184, 105, 0.32);
+  background: rgba(255, 255, 255, 0.055);
+  color: #fff !important;
+  transform: translateX(2px);
+}
+
+.unified-nav-item.current {
+  border-color: rgba(229, 184, 105, 0.42);
+  background:
+    linear-gradient(135deg, rgba(229, 184, 105, 0.12), rgba(255, 255, 255, 0.035));
+  color: #fff !important;
+  box-shadow: 0 0 24px rgba(229, 184, 105, 0.055);
+}
+
+.unified-nav-item.current svg {
+  color: var(--accent-gold);
+}
+
+.unified-signout {
+  margin-top: auto;
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 14px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 69, 58, 0.28);
+  background: rgba(255, 69, 58, 0.08);
+  color: #ff6b61;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.unified-signout:hover {
+  background: rgba(255, 69, 58, 0.13);
+  border-color: rgba(255, 69, 58, 0.42);
+}
+
+@media (max-width: 768px) {
+  .unified-sidebar {
+    width: min(320px, 88vw);
+    max-width: 88vw;
+  }
+
+  .unified-nav-item {
+    min-height: 50px;
+  }
+}
+
+
+/* ============================================================
+   BLUE FIT VISUAL POLISH
+   Unified navigation + pitch-black metric surfaces
+   ============================================================ */
+
+:root {
+  --bluefit-black: #030405;
+  --bluefit-panel: #08090a;
+  --bluefit-panel-2: #0b0c0e;
+  --bluefit-line: rgba(255, 255, 255, 0.075);
+  --bluefit-line-strong: rgba(255, 255, 255, 0.13);
+  --bluefit-mint: #65e6a5;
+  --bluefit-cyan: #4dd8ff;
+  --bluefit-violet: #9b8cff;
+  --bluefit-amber: #ffb84d;
+}
+
+/* One navigation drawer: dark, compact, premium. */
+.unified-sidebar {
+  width: min(318px, 88vw);
+  padding:
+    calc(max(18px, env(safe-area-inset-top)) + 58px)
+    18px
+    max(20px, env(safe-area-inset-bottom));
+  background:
+    radial-gradient(circle at 20% 8%, rgba(101, 230, 165, 0.055), transparent 34%),
+    radial-gradient(circle at 92% 30%, rgba(77, 216, 255, 0.035), transparent 35%),
+    rgba(3, 4, 5, 0.965);
+  border-right: 1px solid rgba(255,255,255,0.075);
+  box-shadow: 22px 0 70px rgba(0,0,0,0.45);
+  backdrop-filter: blur(28px) saturate(125%);
+  -webkit-backdrop-filter: blur(28px) saturate(125%);
+}
+
+.unified-sidebar-header {
+  margin: 0 4px 28px;
+  padding: 0 4px;
+}
+
+.bluefit-nav-brand {
+  display: flex;
+  flex-direction: column;
+}
+
+.bluefit-nav-wordmark {
+  color: #f7f8fa;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  text-shadow: 0 0 28px rgba(255,255,255,0.08);
+}
+
+.bluefit-nav-portal {
+  margin-top: 9px;
+  color: var(--accent-gold);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+}
+
+.bluefit-nav-identity {
+  margin-top: 19px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.065);
+}
+
+.bluefit-nav-name {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 17px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  background: linear-gradient(
+    90deg,
+    #65e6a5 0%,
+    #4dd8ff 34%,
+    #9b8cff 67%,
+    #65e6a5 100%
+  );
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: bluefitIdentityShift 7s linear infinite;
+  filter: drop-shadow(0 0 13px rgba(77,216,255,0.10));
+}
+
+.bluefit-nav-meta {
+  margin-top: 6px;
+  color: rgba(255,255,255,0.43);
+  font-size: 9px;
+  letter-spacing: 0.105em;
+  text-transform: uppercase;
+}
+
+@keyframes bluefitIdentityShift {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 220% 50%; }
+}
+
+.unified-sidebar-nav {
+  gap: 8px;
+}
+
+.unified-nav-item {
+  position: relative;
+  min-height: 48px;
+  padding: 11px 13px;
+  gap: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.055);
+  border-radius: 15px;
+  background: rgba(5,6,7,0.72);
+  color: rgba(255,255,255,0.63) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.018);
+  transition:
+    color .2s ease,
+    background .2s ease,
+    border-color .2s ease,
+    transform .2s ease,
+    box-shadow .2s ease;
+}
+
+.unified-nav-item::after {
+  content: "";
+  position: absolute;
+  right: 13px;
+  top: 50%;
+  width: 3px;
+  height: 20px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--bluefit-cyan), var(--bluefit-mint));
+  opacity: 0;
+  transform: translateY(-50%) scaleY(.45);
+  transition: opacity .2s ease, transform .2s ease;
+}
+
+.unified-nav-item svg {
+  color: rgba(255,255,255,0.42);
+  transition: color .2s ease, filter .2s ease;
+}
+
+.unified-nav-item:hover {
+  transform: translateX(2px);
+  color: rgba(255,255,255,0.92) !important;
+  border-color: rgba(255,255,255,0.10);
+  background: rgba(12,13,15,0.94);
+}
+
+.unified-nav-item:hover svg {
+  color: var(--bluefit-cyan);
+}
+
+.unified-nav-item.current {
+  color: #fff !important;
+  border-color: rgba(101,230,165,0.17);
+  background:
+    linear-gradient(100deg, rgba(101,230,165,0.075), rgba(77,216,255,0.025) 58%, rgba(5,6,7,0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.035),
+    0 10px 28px rgba(0,0,0,0.22);
+}
+
+.unified-nav-item.current::after {
+  opacity: 1;
+  transform: translateY(-50%) scaleY(1);
+}
+
+.unified-nav-item.current svg {
+  color: var(--bluefit-mint);
+  filter: drop-shadow(0 0 7px rgba(101,230,165,0.25));
+}
+
+.unified-signout {
+  min-height: 46px;
+  margin-top: auto;
+  border-radius: 15px;
+  border-color: rgba(255,69,58,0.20);
+  background: rgba(255,69,58,0.045);
+  color: rgba(255,115,106,0.78);
+  transition: all .2s ease;
+}
+
+.unified-signout:hover {
+  background: rgba(255,69,58,0.09);
+  border-color: rgba(255,69,58,0.34);
+  color: #ff8178;
+}
+
+/* Hamburger becomes part of the same dark/glass system. */
+.nav-fab {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  background: rgba(5,6,7,0.88);
+  border-color: rgba(255,255,255,0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.035),
+    0 10px 30px rgba(0,0,0,0.28);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.nav-fab:hover,
+.nav-fab.active {
+  border-color: rgba(101,230,165,0.25);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 0 24px rgba(101,230,165,0.07);
+}
+
+/* Pitch-black shared application surfaces. */
+.app-card,
+.bluefit-pitch-card {
+  background: #050607;
+  border-color: rgba(255,255,255,0.065);
+}
+
+.plan-card {
+  background: #08090a;
+  border-color: rgba(255,255,255,0.065);
+}
+
+.plan-card:hover {
+  background: #0b0c0e;
+  border-color: rgba(255,255,255,0.11);
+}
+
+/* The tracker cards are intentionally darker than the page,
+   with the metric accent supplying the visual energy. */
+.metric-card {
+  background: #08090a;
+}
+
+/* Keep the main dashboard canvas near-black while retaining existing gradients. */
+.main-content {
+  background:
+    radial-gradient(circle at 78% 15%, rgba(77,216,255,0.018), transparent 30%),
+    #030405;
+}
+
+/* Reduce visual noise from any legacy right-side navigation CSS. */
+.nav-fab-right,
+.subnav-stack,
+.subnav-item,
+.sub-sidebar,
+.mobile-header-right-btn {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .unified-sidebar {
+    width: min(318px, 88vw);
+  }
+
+  .main-content {
+    padding-top: calc(74px + env(safe-area-inset-top));
+  }
+}
+
+/* =========================================================
+   BLUE FIT — FINAL UNIFIED NAVIGATION
+   One hamburger -> one left navigation drawer.
+   ========================================================= */
+
+.unified-sidebar {
+  width: 270px;
+  max-width: 88vw;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(3, 5, 7, 0.98),
+      rgba(0, 0, 0, 0.98)
+    );
+
+  border-right: 1px solid rgba(255, 255, 255, 0.075);
+
+  box-shadow:
+    18px 0 60px rgba(0, 0, 0, 0.45);
+
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+
+  padding:
+    calc(max(16px, env(safe-area-inset-top)) + 68px)
+    18px
+    20px;
+
+  display: flex;
+  flex-direction: column;
+}
+
+/* -----------------------------------------
+   BRAND
+   ----------------------------------------- */
+
+.unified-sidebar-header {
+  padding: 0 8px;
+  margin-bottom: 26px;
+}
+
+.bluefit-nav-wordmark {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: #f7f7f7;
+
+  text-shadow:
+    0 0 18px rgba(255, 255, 255, 0.08);
+}
+
+.bluefit-nav-portal {
+  margin-top: 5px;
+
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+
+  color: var(--accent-gold);
+}
+
+/* -----------------------------------------
+   USER IDENTITY — RGB EFFECT
+   ----------------------------------------- */
+
+.bluefit-nav-identity {
+  margin-top: 26px;
+  padding-top: 18px;
+
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.bluefit-nav-name {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+
+  background:
+    linear-gradient(
+      90deg,
+      #00e5ff,
+      #7c5cff,
+      #ff4ecd,
+      #00e5ff
+    );
+
+  background-size: 300% 100%;
+
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+
+  animation: bluefitNameRGB 6s ease-in-out infinite;
+}
+
+.bluefit-nav-meta {
+  margin-top: 5px;
+
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+
+  color: rgba(255, 255, 255, 0.42);
+}
+
+@keyframes bluefitNameRGB {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* -----------------------------------------
+   NAVIGATION
+   ----------------------------------------- */
+
+.unified-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+
+  margin-top: 2px;
+}
+
+.unified-nav-item {
+  position: relative;
+
+  display: flex !important;
+  align-items: center;
+
+  width: 100%;
+  min-height: 48px;
+
+  padding: 12px 14px;
+
+  border-radius: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+
+  background: rgba(5, 5, 7, 0.82);
+
+  color: rgba(255, 255, 255, 0.70) !important;
+
+  font-size: 13px !important;
+  font-weight: 500;
+
+  text-decoration: none !important;
+
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.unified-nav-item svg {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.48);
+  transition: color 180ms ease;
+}
+
+.unified-nav-item:hover {
+  transform: translateX(2px);
+
+  color: #fff !important;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(0, 229, 255, 0.045),
+      rgba(255, 255, 255, 0.025)
+    );
+
+  border-color: rgba(0, 229, 255, 0.18);
+}
+
+.unified-nav-item:hover svg {
+  color: #00e5ff;
+}
+
+/* -----------------------------------------
+   ACTIVE PAGE
+   ----------------------------------------- */
+
+.unified-nav-item.current {
+  color: #fff !important;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(0, 229, 255, 0.08),
+      rgba(124, 92, 255, 0.045)
+    );
+
+  border-color: rgba(0, 229, 255, 0.24);
+
+  box-shadow:
+    inset 0 0 24px rgba(0, 229, 255, 0.025),
+    0 0 24px rgba(0, 229, 255, 0.035);
+}
+
+.unified-nav-item.current::after {
+  content: "";
+
+  position: absolute;
+
+  right: 11px;
+  top: 50%;
+
+  width: 3px;
+  height: 20px;
+
+  transform: translateY(-50%);
+
+  border-radius: 999px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #00e5ff,
+      #7c5cff,
+      #ff4ecd
+    );
+
+  box-shadow:
+    0 0 10px rgba(0, 229, 255, 0.65);
+}
+
+.unified-nav-item.current svg {
+  color: #00e5ff;
+}
+
+/* -----------------------------------------
+   SIGN OUT
+   ----------------------------------------- */
+
+.unified-signout {
+  margin-top: auto;
+
+  width: 100%;
+  min-height: 46px;
+
+  padding: 11px 14px;
+
+  display: flex;
+  align-items: center;
+  gap: 9px;
+
+  border-radius: 15px;
+
+  border: 1px solid rgba(255, 69, 58, 0.20);
+
+  background: rgba(255, 69, 58, 0.045);
+
+  color: rgba(255, 100, 92, 0.9);
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    background 180ms ease,
+    border-color 180ms ease;
+}
+
+.unified-signout:hover {
+  background: rgba(255, 69, 58, 0.09);
+  border-color: rgba(255, 69, 58, 0.35);
+}
+
+/* -----------------------------------------
+   NEVER SHOW THE OLD RIGHT NAV
+   ----------------------------------------- */
+
+.nav-fab-right,
+.subnav-stack,
+.sub-sidebar {
+  display: none !important;
+}
+
+/* Desktop: let the opened navigation occupy its own visual column */
+@media (min-width: 769px) {
+  .app-container.nav-open .main-content {
+    margin-left: 270px;
+    width: calc(100% - 270px);
+    transition:
+      margin-left 260ms ease,
+      width 260ms ease;
+  }
+
+  .main-content {
+    transition:
+      margin-left 260ms ease,
+      width 260ms ease;
+  }
+}
+/* =========================================================
+   BLUE FIT — RIGHT-SIDE POP-OUT NAVIGATION
+   Reference behavior: left hamburger stays fixed; clicking it
+   reveals a compact stack of navigation buttons on the right.
+   The dashboard itself is never pushed or replaced by a sidebar.
+   ========================================================= */
+
+:root {
+  --bluefit-nav-cyan: #4dd8ff;
+  --bluefit-nav-mint: #65e6a5;
+  --bluefit-nav-purple: #9b8cff;
+}
+
+/* The global hamburger remains the only navigation trigger. */
+.nav-fab {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top));
+  left: 20px;
+  z-index: 2000;
+
+  width: 46px;
+  height: 46px;
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 15px;
+
+  background: rgba(5, 6, 8, 0.88);
+  color: #fff;
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.035),
+    0 10px 30px rgba(0,0,0,0.28);
+
+  cursor: pointer;
+
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    background 180ms ease;
+}
+
+.nav-fab:hover,
+.nav-fab.active {
+  border-color: rgba(229, 184, 105, 0.38);
+  background: rgba(8, 9, 11, 0.94);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.045),
+    0 0 24px rgba(229, 184, 105, 0.07),
+    0 12px 34px rgba(0,0,0,0.30);
+}
+
+.nav-fab:active {
+  transform: scale(0.94);
+}
+
+/* Kill the old full-screen/sidebar implementation if any stale markup exists. */
+.main-sidebar {
+  display: none !important;
+}
+
+/* No full-screen dimming: the reference menu floats over the dashboard. */
+.mobile-overlay {
+  display: none !important;
+}
+
+/* =========================================================
+   THE NEW RIGHT FLOATING STACK
+   ========================================================= */
+
+.bluefit-pop-nav {
+  position: fixed;
+  top: calc(max(16px, env(safe-area-inset-top)) + 72px);
+  right: 20px;
+  z-index: 1900;
+
+  width: 182px;
+  max-width: calc(100vw - 40px);
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+
+  transform: translateX(20px) translateY(-4px) scale(0.97);
+  transform-origin: top right;
+
+  transition:
+    opacity 220ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 260ms;
+}
+
+.bluefit-pop-nav.open {
+  pointer-events: auto;
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(0) translateY(0) scale(1);
+
+  transition:
+    opacity 180ms ease,
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 0s;
+}
+
+.bluefit-pop-nav-item,
+.bluefit-pop-nav-signout {
+  position: relative;
+
+  width: 100%;
+  min-height: 56px;
+  box-sizing: border-box;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  padding: 0 16px;
+
+  border-radius: 17px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(11, 12, 15, 0.96),
+      rgba(4, 5, 7, 0.94)
+    );
+
+  color: rgba(255,255,255,0.78);
+
+  text-decoration: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.025),
+    0 12px 30px rgba(0,0,0,0.24);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  overflow: hidden;
+
+  opacity: 0;
+  transform: translateX(16px);
+
+  transition:
+    opacity 180ms ease,
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.bluefit-pop-nav.open .bluefit-pop-nav-item {
+  opacity: 1;
+  transform: translateX(0);
+  transition-delay: calc(var(--nav-i, 0) * 48ms);
+}
+
+.bluefit-pop-nav-item svg,
+.bluefit-pop-nav-signout svg {
+  flex-shrink: 0;
+  color: rgba(255,255,255,0.56);
+  transition: color 180ms ease, filter 180ms ease;
+}
+
+.bluefit-pop-nav-item span:not(.bluefit-pop-nav-indicator),
+.bluefit-pop-nav-signout span {
+  white-space: nowrap;
+}
+
+.bluefit-pop-nav-item:hover {
+  transform: translateX(-2px);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(16, 18, 21, 0.98),
+      rgba(7, 8, 10, 0.98)
+    );
+}
+
+.bluefit-pop-nav-item:hover svg {
+  color: var(--bluefit-nav-cyan);
+  filter: drop-shadow(0 0 7px rgba(77,216,255,0.28));
+}
+
+/* Active item matches the gold-edged reference styling. */
+.bluefit-pop-nav-item.current {
+  border-color: rgba(229, 184, 105, 0.43);
+  color: #fff;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(27, 23, 15, 0.76),
+      rgba(9, 10, 12, 0.97)
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.035),
+    0 0 26px rgba(229,184,105,0.045),
+    0 12px 30px rgba(0,0,0,0.25);
+}
+
+.bluefit-pop-nav-item.current svg {
+  color: var(--accent-gold);
+  filter: drop-shadow(0 0 7px rgba(229,184,105,0.24));
+}
+
+.bluefit-pop-nav-indicator {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+
+  width: 3px;
+  height: 22px;
+
+  border-radius: 999px;
+
+  background:
+    linear-gradient(
+      180deg,
+      var(--bluefit-nav-cyan),
+      var(--bluefit-nav-purple),
+      var(--bluefit-nav-mint)
+    );
+
+  box-shadow:
+    0 0 10px rgba(77,216,255,0.55);
+
+  opacity: 0;
+  transform: translateY(-50%) scaleY(0.45);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.bluefit-pop-nav-item.current .bluefit-pop-nav-indicator {
+  opacity: 1;
+  transform: translateY(-50%) scaleY(1);
+}
+
+.bluefit-pop-nav-signout {
+  min-height: 50px;
+  margin-top: 2px;
+
+  justify-content: flex-start;
+
+  border-color: rgba(255, 69, 58, 0.18);
+  background: rgba(22, 5, 6, 0.88);
+  color: rgba(255, 112, 103, 0.85);
+
+  cursor: pointer;
+
+  opacity: 0;
+  transform: translateX(16px);
+}
+
+.bluefit-pop-nav.open .bluefit-pop-nav-signout {
+  opacity: 1;
+  transform: translateX(0);
+  transition-delay: calc(var(--nav-i, 0) * 48ms + 48ms);
+}
+
+.bluefit-pop-nav-signout:hover {
+  border-color: rgba(255,69,58,0.35);
+  background: rgba(31, 7, 8, 0.95);
+  color: #ff8178;
+}
+
+.bluefit-pop-nav-signout:hover svg {
+  color: #ff8178;
+}
+
+/* The page never shifts horizontally when the nav opens. */
+.app-container.nav-open .main-content,
+.app-container.nav-open {
+  margin-left: 0 !important;
+  width: 100% !important;
+}
+
+.main-content {
+  transition: none !important;
+}
+
+/* Keep the mobile title centered exactly like the reference. */
+@media (max-width: 768px) {
+  .mobile-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-bottom: 16px;
+  }
+
+  .mobile-header .glazy-title {
+    max-width: calc(100vw - 170px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 18px !important;
+  }
+
+  .bluefit-pop-nav {
+    top: calc(max(16px, env(safe-area-inset-top)) + 74px);
+    right: 18px;
+    width: 184px;
+    max-width: calc(100vw - 36px);
+  }
+
+  .bluefit-pop-nav-item {
+    min-height: 56px;
+    border-radius: 17px;
+  }
+
+  .main-content {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+}
+
+@media (max-width: 430px) {
+  .bluefit-pop-nav {
+    width: 174px;
+    right: 14px;
+  }
+
+  .bluefit-pop-nav-item,
+  .bluefit-pop-nav-signout {
+    padding-left: 14px;
+    padding-right: 14px;
+    font-size: 13px;
+  }
+
+  .bluefit-pop-nav-item svg,
+  .bluefit-pop-nav-signout svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+
+/* =========================================================
+   BLUE FIT — FINAL POLISH
+   Left hamburger -> compact floating menu on the LEFT.
+   The menu is NOT a sidebar/drawer and never pushes the page.
+   ========================================================= */
+
+.bluefit-pop-nav {
+  position: fixed !important;
+  left: max(14px, env(safe-area-inset-left)) !important;
+  right: auto !important;
+  top: calc(max(16px, env(safe-area-inset-top)) + 66px) !important;
+
+  width: 188px !important;
+  max-width: calc(100vw - 28px) !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 9px !important;
+
+  transform-origin: top left !important;
+  transform: translateY(-8px) translateX(-7px) scale(0.94) !important;
+
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+
+  filter: blur(1.5px);
+
+  transition:
+    opacity 180ms ease,
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 320ms ease,
+    visibility 0s linear 320ms !important;
+}
+
+.bluefit-pop-nav.open {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+
+  transform: translateY(0) translateX(0) scale(1) !important;
+  filter: blur(0) !important;
+
+  transition:
+    opacity 180ms ease,
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 360ms ease,
+    visibility 0s linear 0s !important;
+}
+
+.bluefit-pop-nav::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: -9px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle,
+      rgba(229,184,105,0.12) 0%,
+      rgba(77,216,255,0.06) 35%,
+      transparent 72%
+    );
+  filter: blur(14px);
+  pointer-events: none;
+}
+
+.bluefit-pop-nav-item,
+.bluefit-pop-nav-signout {
+  min-height: 58px !important;
+  padding: 0 15px !important;
+
+  border-radius: 17px !important;
+  border: 1px solid rgba(255,255,255,0.075) !important;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(6,7,9,0.985),
+      rgba(0,0,0,0.975)
+    ) !important;
+
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.028),
+    0 16px 32px rgba(0,0,0,0.26) !important;
+
+  backdrop-filter: blur(22px) saturate(110%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(110%) !important;
+
+  opacity: 0 !important;
+  transform: translateY(-8px) scale(0.97) !important;
+}
+
+.bluefit-pop-nav.open .bluefit-pop-nav-item,
+.bluefit-pop-nav.open .bluefit-pop-nav-signout {
+  opacity: 1 !important;
+  transform: translateY(0) scale(1) !important;
+}
+
+.bluefit-pop-nav.open .bluefit-pop-nav-item {
+  transition-delay: calc(var(--nav-i, 0) * 55ms) !important;
+}
+
+.bluefit-pop-nav.open .bluefit-pop-nav-signout {
+  transition-delay: calc(var(--nav-i, 0) * 55ms + 55ms) !important;
+}
+
+.bluefit-pop-nav-item:hover {
+  transform: translateX(2px) scale(1.01) !important;
+  border-color: rgba(255,255,255,0.14) !important;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(12,13,16,0.99),
+      rgba(2,3,4,0.985)
+    ) !important;
+}
+
+.bluefit-pop-nav-item.current {
+  border-color: rgba(229,184,105,0.42) !important;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(20,17,11,0.96),
+      rgba(3,4,5,0.985)
+    ) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.032),
+    0 0 24px rgba(229,184,105,0.04),
+    0 16px 32px rgba(0,0,0,0.26) !important;
+}
+
+.bluefit-pop-nav-item.current svg {
+  color: var(--accent-gold) !important;
+  filter: drop-shadow(0 0 8px rgba(229,184,105,0.28)) !important;
+}
+
+.bluefit-pop-nav-indicator {
+  right: 7px !important;
+  width: 3px !important;
+  height: 24px !important;
+
+  background:
+    linear-gradient(
+      180deg,
+      #4dd8ff 0%,
+      #9b8cff 50%,
+      #65e6a5 100%
+    ) !important;
+
+  box-shadow:
+    0 0 10px rgba(77,216,255,0.55) !important;
+}
+
+.bluefit-pop-nav-signout {
+  min-height: 48px !important;
+  margin-top: 2px !important;
+  border-color: rgba(255,69,58,0.16) !important;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(17,4,5,0.96),
+      rgba(2,0,0,0.98)
+    ) !important;
+}
+
+/* Hamburger: premium glass button, visually tied to the pop stack. */
+.nav-fab.nav-fab-left {
+  width: 48px !important;
+  height: 48px !important;
+  left: max(14px, env(safe-area-inset-left)) !important;
+  top: max(16px, env(safe-area-inset-top)) !important;
+
+  border-radius: 16px !important;
+  border-color: rgba(255,255,255,0.09) !important;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(8,9,11,0.94),
+      rgba(0,0,0,0.90)
+    ) !important;
+
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.035),
+    0 12px 28px rgba(0,0,0,0.28) !important;
+}
+
+.nav-fab.nav-fab-left.active {
+  border-color: rgba(229,184,105,0.38) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 0 24px rgba(229,184,105,0.07),
+    0 12px 30px rgba(0,0,0,0.32) !important;
+}
+
+/* =========================================================
+   PREMIUM PITCH-BLACK METRIC SURFACES
+   ========================================================= */
+
+.metric-card {
+  background:
+    linear-gradient(
+      145deg,
+      rgba(4,5,6,0.985),
+      rgba(0,0,0,0.985)
+    ) !important;
+
+  border-color: rgba(255,255,255,0.065) !important;
+
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.018),
+    0 18px 42px rgba(0,0,0,0.24) !important;
+}
+
+/* Keep accent glows subtle — the metric itself remains premium and dark. */
+.metric-card > div:first-child {
+  opacity: 0.22 !important;
+}
+
+/* =========================================================
+   CALMER TRACKER SURFACES
+   ========================================================= */
+
+@media (max-width: 768px) {
+  .bluefit-pop-nav {
+    left: max(14px, env(safe-area-inset-left)) !important;
+    right: auto !important;
+    top: calc(max(16px, env(safe-area-inset-top)) + 70px) !important;
+    width: min(188px, calc(100vw - 28px)) !important;
+  }
+}
+
+@media (max-width: 430px) {
+  .bluefit-pop-nav {
+    width: 178px !important;
+  }
+
+  .bluefit-pop-nav-item,
+  .bluefit-pop-nav-signout {
+    min-height: 55px !important;
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+    border-radius: 16px !important;
+  }
+}
+
+/* =========================================================
+   BLUE FIT — QUIET PREMIUM INTERACTION LAYER
+   Ambient effects are visible at rest and strengthen on hover/press.
+   ========================================================= */
+
+:root {
+  --bluefit-surface: #030405;
+  --bluefit-surface-soft: #060708;
+  --bluefit-line-quiet: rgba(255,255,255,0.055);
+  --bluefit-line-active: rgba(104,199,161,0.22);
+  --bluefit-mint-quiet: #68C7A1;
+  --bluefit-cyan-quiet: #5BAFC0;
+  --bluefit-violet-quiet: #8E82C7;
+  --bluefit-gold-quiet: #B89257;
+  --bluefit-orange-quiet: #C98268;
+}
+
+.metric-card,
+.bf-premium-surface,
+.plan-card,
+.app-card {
+  transition:
+    transform 220ms ease,
+    border-color 220ms ease,
+    background 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.metric-card,
+.bf-premium-surface {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.018),
+    0 18px 42px rgba(0,0,0,0.25),
+    0 0 22px rgba(104,199,161,0.018) !important;
+}
+
+.metric-card:hover,
+.bf-premium-surface:hover,
+.plan-card:hover,
+.app-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.10) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.024),
+    0 20px 44px rgba(0,0,0,0.28),
+    0 0 26px rgba(104,199,161,0.028) !important;
+}
+
+.metric-card:active,
+.bf-premium-surface:active,
+.plan-card:active,
+.app-card:active {
+  transform: translateY(0) scale(0.995);
+}
+
+/* The pop navigation has an ambient resting state; hover only strengthens it. */
+.bluefit-pop-nav-item {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.024),
+    0 12px 28px rgba(0,0,0,0.20),
+    0 0 18px rgba(77,216,255,0.018) !important;
+}
+
+.bluefit-pop-nav-item:hover {
+  border-color: rgba(77,216,255,0.18) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.03),
+    0 15px 32px rgba(0,0,0,0.28),
+    0 0 25px rgba(77,216,255,0.045) !important;
+}
+
+.bluefit-pop-nav-item.current {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.03),
+    0 14px 30px rgba(0,0,0,0.24),
+    0 0 24px rgba(229,184,105,0.045) !important;
+}
+
+/* =========================================================
+   BLUE FIT — HEALTH OVERVIEW SURFACES
+   ========================================================= */
+
+.bf-premium-overview,
+.bf-focus-card,
+.bf-weekly-card,
+.bf-coach-overview,
+.bf-coach-signal-card {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.017),
+    0 20px 46px rgba(0,0,0,0.22),
+    0 0 26px rgba(104,199,161,0.014);
+}
+
+.bf-premium-overview:hover,
+.bf-focus-card:hover,
+.bf-weekly-card:hover,
+.bf-coach-overview:hover,
+.bf-coach-signal-card:hover {
+  border-color: rgba(255,255,255,0.09) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.022),
+    0 22px 48px rgba(0,0,0,0.26),
+    0 0 30px rgba(104,199,161,0.024);
+}
+
+/* =========================================================
+   BLUE FIT — COACH TRACKER
+   ========================================================= */
+
+.bf-coach-tracker {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.bf-coach-overview {
+  position: relative;
+  overflow: hidden;
+  min-height: 315px;
+  padding: 25px;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: center;
+  gap: 24px;
+  border-radius: 26px;
+  border: 1px solid rgba(255,255,255,0.065);
+  background: linear-gradient(145deg, rgba(3,4,5,0.985), rgba(0,0,0,0.99));
+}
+
+.bf-coach-overview-glow {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  right: -120px;
+  top: -130px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99,185,155,0.06), rgba(0,0,0,0) 70%);
+  filter: blur(18px);
+  pointer-events: none;
+}
+
+.bf-coach-copy,
+.bf-coach-rings {
+  position: relative;
+  z-index: 1;
+}
+
+.bf-coach-copy h3 {
+  margin: 8px 0 0;
+  color: var(--text-primary);
+  font-size: 25px;
+  letter-spacing: -0.03em;
+}
+
+.bf-coach-copy > p {
+  max-width: 470px;
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.bf-coach-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 430px;
+  margin-top: 27px;
+}
+
+.bf-coach-rings {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+}
+
+.bf-coach-ring-caption {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 11px;
+  color: rgba(255,255,255,0.30);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bf-coach-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 14px;
+}
+
+.bf-coach-signal-card {
+  padding: 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(255,255,255,0.065);
+  background: linear-gradient(145deg, rgba(3,4,5,0.985), rgba(0,0,0,0.99));
+}
+
+.bf-coach-signal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  color: rgba(255,255,255,0.36);
+}
+
+.bf-coach-signal-head h4 {
+  margin: 6px 0 0;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.bf-coach-signal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.bf-signal {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.045);
+  background: rgba(255,255,255,0.022);
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.bf-signal:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.075);
+  background: rgba(255,255,255,0.032);
+}
+
+.bf-signal-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.bf-signal-title {
+  color: var(--text-secondary);
+  font-size: 9px;
+  margin-bottom: 4px;
+}
+
+.bf-signal-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255,255,255,0.82);
+  font-size: 11px;
+  font-weight: 550;
+}
+
+/* Slightly quieter coach metric palette. */
+.bf-coach-tracker .metric-card {
+  background: linear-gradient(145deg, rgba(3,4,5,0.99), rgba(0,0,0,0.995)) !important;
+}
+
+/* =========================================================
+   BLUE FIT — MOTION ACCESSIBILITY
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .bluefit-pop-nav,
+  .bluefit-pop-nav-item,
+  .bluefit-pop-nav-signout,
+  .metric-card,
+  .bf-premium-surface,
+  .plan-card,
+  .app-card,
+  .bf-signal,
+  .bf-outline-action {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* =========================================================
+   BLUE FIT — RESPONSIVE HEALTH OVERVIEW
+   ========================================================= */
+
+@media (max-width: 760px) {
+  .bf-premium-overview,
+  .bf-coach-overview {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .bf-overview-rings,
+  .bf-coach-rings {
+    order: -1;
+  }
+
+  .bf-client-metric-grid,
+  .bf-client-secondary-grid,
+  .bf-coach-metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bf-coach-signal-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .bf-premium-overview,
+  .bf-coach-overview {
+    padding: 20px;
+  }
+
+  .bf-focus-card {
+    grid-template-columns: auto minmax(0,1fr);
+  }
+
+  .bf-week-bars {
+    gap: 7px;
+  }
+}
+
+/* Empty-state rhythm placeholders: stay quiet until real activity exists. */
+.bf-week-empty {
+  min-height: 92px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed rgba(255,255,255,0.055);
+  border-radius: 16px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+}
+
+
+.spin {
+  animation: bluefitSpin 1s linear infinite;
+}
+
+@keyframes bluefitSpin {
+  to { transform: rotate(360deg); }
+}

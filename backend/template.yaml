@@ -1,6 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-
 Description: The Blue Fit - FastAPI Backend
 
 Parameters:
@@ -9,7 +8,7 @@ Parameters:
     Description: >-
       Websites / apps allowed to call this API from a browser. Add your production web
       domain here and, for phone testing on your Wi-Fi, your dev server address.
-    Default: "http://localhost:3000,http://localhost,https://localhost"
+    Default: "http://localhost:3000,capacitor://localhost,http://localhost,https://localhost"
 
 Globals:
   Function:
@@ -20,12 +19,6 @@ Globals:
       - arm64
 
 Resources:
-
-  # ---------------------------------------------------------------------------
-  # SESSION SIGNING SECRET
-  # AWS generates the actual secret value.
-  # The Lambda receives only the secret ARN.
-  # ---------------------------------------------------------------------------
   AuthSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
@@ -34,101 +27,103 @@ Resources:
         PasswordLength: 64
         ExcludePunctuation: true
 
-  # ---------------------------------------------------------------------------
-  # DATABASE
-  # ---------------------------------------------------------------------------
   BlueFitDatabase:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
-
     Properties:
       TableName: BlueFit-Table
       BillingMode: PAY_PER_REQUEST
-
       AttributeDefinitions:
         - AttributeName: PK
           AttributeType: S
         - AttributeName: SK
           AttributeType: S
-
       KeySchema:
         - AttributeName: PK
           KeyType: HASH
         - AttributeName: SK
           KeyType: RANGE
 
-  # ---------------------------------------------------------------------------
-  # HTTP API
-  # ---------------------------------------------------------------------------
+  ClientMediaBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins: !Ref AllowedOrigins
+            AllowedMethods:
+              - POST
+              - GET
+              - HEAD
+            AllowedHeaders:
+              - '*'
+            ExposedHeaders:
+              - ETag
+            MaxAge: 300
+
   BlueFitHttpApi:
     Type: AWS::Serverless::HttpApi
-
     Properties:
       DefaultRouteSettings:
         ThrottlingBurstLimit: 20
         ThrottlingRateLimit: 10
-
       CorsConfiguration:
         AllowOrigins: !Ref AllowedOrigins
-
         AllowHeaders:
           - Authorization
           - Content-Type
-
         AllowMethods:
           - GET
           - POST
           - PUT
           - DELETE
           - OPTIONS
-
         MaxAge: 600
 
-  # ---------------------------------------------------------------------------
-  # CORE FASTAPI LAMBDA
-  # ---------------------------------------------------------------------------
   CoreApiFunction:
     Type: AWS::Serverless::Function
-
     Properties:
       CodeUri: functions/core_api/
       Handler: main.handler
-
-      # Environment variables required by the FastAPI application.
       Environment:
         Variables:
           TABLE_NAME: !Ref BlueFitDatabase
           AUTH_SECRET_ARN: !Ref AuthSecret
+          CLIENT_MEDIA_BUCKET: !Ref ClientMediaBucket
           ALLOWED_ORIGINS: !Join [",", !Ref AllowedOrigins]
-
-      # Permissions required by the Lambda.
       Policies:
-
-        # DynamoDB access for application data.
         - DynamoDBCrudPolicy:
             TableName: !Ref BlueFitDatabase
-
-        # Allows the Lambda to read the generated session-signing secret.
         - AWSSecretsManagerGetSecretValuePolicy:
             SecretArn: !Ref AuthSecret
-
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource: !Sub "${ClientMediaBucket.Arn}/clients/*"
       Events:
-
-        # Forward every API route to FastAPI.
         FastApiCatchAll:
           Type: HttpApi
-
           Properties:
             ApiId: !Ref BlueFitHttpApi
             Path: /{proxy+}
             Method: ANY
 
-# ---------------------------------------------------------------------------
-# OUTPUTS
-# ---------------------------------------------------------------------------
 Outputs:
-
   ApiUrl:
     Description: >-
       Base URL for the unified FastAPI backend.
@@ -136,11 +131,12 @@ Outputs:
     Value: !Sub
       - "https://${ApiId}.execute-api.${AWS::Region}.amazonaws.com"
       - ApiId: !Ref BlueFitHttpApi
-
   TableName:
     Description: DynamoDB table name
     Value: !Ref BlueFitDatabase
-
+  ClientMediaBucketName:
+    Description: Private S3 bucket for client 3-day-log photos
+    Value: !Ref ClientMediaBucket
   AuthSecretArn:
     Description: ARN of the AWS-generated session signing secret
     Value: !Ref AuthSecret

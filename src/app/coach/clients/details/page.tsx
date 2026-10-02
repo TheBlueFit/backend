@@ -15,7 +15,7 @@ function ClientDetailsContent() {
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await dashboardAPI.getCoachClients('coach-123');
+        const data = await dashboardAPI.getCoachClients();
         setClient(data.clients.find((c) => c.id === clientId) ?? null);
       } catch (error) {
         console.error('Failed to fetch client:', error);
@@ -72,13 +72,23 @@ function ClientDetailsContent() {
               </div>
             </div>
 
-            <Link
-              href={`/coach/clients/details/progress?id=${client.id}`}
-              className="btn-primary"
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', textDecoration: 'none' }}
-            >
-              <TrendingUp size={16} /> VIEW PROGRESS ANALYTICS
-            </Link>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
+              <Link
+                href={`/coach/clients/details/progress?id=${client.id}`}
+                className="btn-primary"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', textDecoration: 'none' }}
+              >
+                <TrendingUp size={16} /> VIEW PROGRESS ANALYTICS
+              </Link>
+
+              <Link
+                href={`/coach/clients/check-status?clientId=${encodeURIComponent(client.id)}`}
+                className="btn-secondary"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', textDecoration: 'none' }}
+              >
+                VIEW CHECK STATUS
+              </Link>
+            </div>
           </>
         )}
 
