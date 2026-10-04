@@ -101,8 +101,11 @@ export interface ThreeDayPhoto {
   meal: string;
   originalFileName: string;
   contentType: string;
-  uploadedAt: string;
+  /** S3 object key — use this with getMediaViewUrl() to display the image in-app. */
+  objectKey?: string;
+  /** Short-lived presigned URL kept for backward compatibility only. Do NOT use as an href. */
   viewUrl?: string;
+  uploadedAt: string;
 }
 
 export interface ThreeDayDayStatus {
@@ -178,6 +181,16 @@ export const dashboardAPI = {
 
   getAllUsers: () => apiFetch<any[]>('/admin/users'),
   getAdminData: () => apiFetch<{ stats: any[] }>('/admin/dashboard/stats'),
+  updateUser: (userId: string, payload: Record<string, any>) =>
+    apiFetch<{ message: string; user: any }>(`/admin/users/${encodeURIComponent(userId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  resetUserPassword: (userId: string) =>
+    apiFetch<{ message: string; userId: string; userCode: string; tempPassword: string }>(
+      `/admin/users/${encodeURIComponent(userId)}/reset-password`,
+      { method: 'POST' }
+    ),
   deleteUser: (userId: string) =>
     apiFetch<{ message: string }>(`/admin/users/${encodeURIComponent(userId)}`, {
       method: 'DELETE',
@@ -295,4 +308,57 @@ export const dashboardAPI = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+
+  // --- WORKOUT IMAGE IMPORT ---
+  getWorkoutImageUploadUrl: (fileName: string, contentType: string) =>
+    apiFetch<{ uploadUrl: string; fields: Record<string, string>; objectKey: string; expiresIn: number }>(
+      `/coach/${encodeURIComponent(sessionId())}/templates/import/upload-url`,
+      { method: 'POST', body: JSON.stringify({ fileName, contentType }) }
+    ),
+
+  generateWorkoutFromImage: (objectKey: string) =>
+    apiFetch<{ objectKey: string; extracted: any }>(
+      `/coach/${encodeURIComponent(sessionId())}/templates/import/generate`,
+      { method: 'POST', body: JSON.stringify({ objectKey }) }
+    ),
+
+  approveWorkoutTemplate: (objectKey: string, template: any) =>
+    apiFetch<{ message: string; template: any }>(
+      `/coach/${encodeURIComponent(sessionId())}/templates/import/approve`,
+      { method: 'POST', body: JSON.stringify({ objectKey, template }) }
+    ),
+
+  // --- TEMPLATE ASSIGNMENT ---
+  assignTemplateToClient: (templateId: string, clientId: string, startDate?: string, notes?: string) =>
+    apiFetch<{ message: string; assignmentId: string; clientId: string; startDate: string }>(
+      `/coach/${encodeURIComponent(sessionId())}/templates/${encodeURIComponent(templateId)}/assign`,
+      { method: 'POST', body: JSON.stringify({ clientId, startDate, notes }) }
+    ),
+
+  getClientSchedules: (clientId: string) =>
+    apiFetch<{ schedules: any[] }>(
+      `/coach/${encodeURIComponent(sessionId())}/clients/${encodeURIComponent(clientId)}/schedules`
+    ),
+
+  // --- ATHLETE SCHEDULES ---
+  getAthleteSchedules: () =>
+    apiFetch<{ schedules: any[] }>(
+      `/athlete/${encodeURIComponent(sessionId())}/schedules`
+    ),
+
+  getAthleteScheduleDetail: (assignmentId: string) =>
+    apiFetch<any>(
+      `/athlete/${encodeURIComponent(sessionId())}/schedules/${encodeURIComponent(assignmentId)}`
+    ),
+
+  // --- MEDIA VIEWER ---
+  getMediaViewUrl: (objectKey: string) =>
+    apiFetch<{ viewUrl: string; objectKey: string }>(
+      `/media/view?objectKey=${encodeURIComponent(objectKey)}`
+    ),
+
+  getTemplateImageView: (templateId: string) =>
+    apiFetch<{ viewUrl: string; objectKey: string }>(
+      `/coach/templates/${encodeURIComponent(templateId)}/image-view`
+    ),
 };

@@ -405,7 +405,7 @@ def clean_exercises(exercises: Optional[List[Dict[str, Any]]]) -> Optional[List[
 
 
 def template_out(item: dict) -> dict:
-    return parse_decimals({
+    out = parse_decimals({
         "id": item['SK'].split('#', 1)[1],
         "title": item.get('title', ''),
         "description": item.get('description', ''),
@@ -413,7 +413,24 @@ def template_out(item: dict) -> dict:
         "workoutDays": item.get('workoutDays', ''),
         "goal": item.get('goal', ''),
         "exercises": item.get('exercises', []),
+        "level": item.get('level', ''),
+        "estimatedDuration": item.get('estimatedDuration', ''),
+        "equipment": item.get('equipment', ''),
+        "referenceImageKey": item.get('referenceImageKey', ''),
     })
+    # Generate a short-lived presigned URL for the reference image if present
+    if out.get('referenceImageKey') and CLIENT_MEDIA_BUCKET:
+        try:
+            out['referenceImageUrl'] = s3.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': CLIENT_MEDIA_BUCKET, 'Key': out['referenceImageKey']},
+                ExpiresIn=3600,
+            )
+        except Exception:
+            out['referenceImageUrl'] = None
+    else:
+        out['referenceImageUrl'] = None
+    return out
 
 
 def find_template(template_id: str, coach_pk: Optional[str]) -> Optional[dict]:
@@ -556,6 +573,27 @@ class TemplatePayload(BaseModel):
     workoutDays: Optional[str] = None
     activities: Optional[str] = None
     exercises: Optional[List[Dict[str, Any]]] = None
+    level: Optional[str] = None
+    estimatedDuration: Optional[str] = None
+    equipment: Optional[str] = None
+    referenceImageKey: Optional[str] = None
+
+
+class WorkoutImageUploadPayload(BaseModel):
+    fileName: str
+    contentType: str
+
+
+class AssignTemplatePayload(BaseModel):
+    clientId: str
+    startDate: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class ClientSchedulePayload(BaseModel):
+    templateId: str
+    startDate: str
+    notes: Optional[str] = None
 
 
 class ThreeDayLogPayload(BaseModel):
@@ -638,8 +676,9 @@ def three_day_status(client_pk: str) -> dict:
             'meal': item.get('meal', ''),
             'originalFileName': item.get('originalFileName', ''),
             'contentType': item.get('contentType', ''),
+            'objectKey': item.get('objectKey', ''),   # ← added: lets frontend use /media/view
             'uploadedAt': item.get('uploadedAt', item.get('createdAt', '')),
-            'viewUrl': view_url,
+            'viewUrl': view_url,                       # kept for backwards compat; not used as href
         })
 
     output_days = []
@@ -902,6 +941,114 @@ def delete_user(userId: str, user: dict = Depends(require_roles('ADMIN'))):
     return {"message": f"User {pk} deleted successfully"}
 
 
+class AdminUserUpdatePayload(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    status: Optional[str] = None
+    age: Optional[float] = None
+    height: Optional[float] = None
+    weight: Optional[float] = None
+    activityLevel: Optional[str] = None
+    primaryGoal: Optional[str] = None
+    medicalNotes: Optional[str] = None
+    specialization: Optional[str] = None
+
+
+@app.put("/admin/users/{userId}")
+def update_user(userId: str, payload: AdminUserUpdatePayload, user: dict = Depends(require_roles('ADMIN'))):
+    """Admin-only user edit. Role and userCode remain immutable here."""
+    pk = unquote(userId).strip()
+    if '#' not in pk:
+        raise HTTPException(status_code=400, detail="userId must be a full key such as CLIENT#CLS001")
+    profile = get_profile(pk)
+    if not profile:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if profile.get('role') == 'ADMIN':
+        raise HTTPException(status_code=403, detail="Admin accounts cannot be edited from here.")
+
+    data = payload.model_dump(exclude_unset=True)
+    updates: Dict[str, Any] = {}
+
+    if 'name' in data:
+        name = clean_text(data.get('name'), 100)
+        if not name:
+            raise HTTPException(status_code=400, detail="Name is required.")
+        updates['name'] = name
+
+    if 'email' in data:
+        email = (clean_text(data.get('email'), 200) or '').lower()
+        if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+            raise HTTPException(status_code=400, detail="A valid email address is required.")
+        if any(str(p.get('PK')) != pk and str(p.get('email', '')).lower() == email for p in all_profiles()):
+            raise HTTPException(status_code=409, detail="That email is already registered.")
+        updates['email'] = email
+
+    if 'status' in data:
+        status = str(data.get('status') or '').strip().upper()
+        if status not in {'ACTIVE', 'INACTIVE'}:
+            raise HTTPException(status_code=400, detail="Status must be ACTIVE or INACTIVE.")
+        updates['status'] = status
+
+    baseline = baseline_fields(profile.get('role', 'CLIENT'), data)
+    updates.update(baseline)
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="No changes provided.")
+
+    updates['updatedAt'] = now_iso()
+    updates = to_dynamo(updates)
+    names = {f"#f{i}": k for i, k in enumerate(updates)}
+    values = {f":v{i}": v for i, v in enumerate(updates.values())}
+    expression = "SET " + ", ".join(f"#f{i} = :v{i}" for i in range(len(updates)))
+
+    table.update_item(
+        Key={'PK': pk, 'SK': PROFILE_SK},
+        UpdateExpression=expression,
+        ExpressionAttributeNames=names,
+        ExpressionAttributeValues=values,
+    )
+
+    fresh = get_profile(pk)
+    return {"message": "User updated successfully", "user": pick(fresh or {}, ADMIN_VIEW_FIELDS)}
+
+
+@app.post("/admin/users/{userId}/reset-password")
+def reset_user_password(userId: str, user: dict = Depends(require_roles('ADMIN'))):
+    """Generate a new temporary password, require change on next login, and revoke old sessions."""
+    pk = unquote(userId).strip()
+    if '#' not in pk:
+        raise HTTPException(status_code=400, detail="userId must be a full key such as CLIENT#CLS001")
+    profile = get_profile(pk)
+    if not profile:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if profile.get('role') == 'ADMIN':
+        raise HTTPException(status_code=403, detail="Admin passwords cannot be reset from here.")
+
+    temp_password = generate_temp_password()
+    table.update_item(
+        Key={'PK': pk, 'SK': PROFILE_SK},
+        UpdateExpression=(
+            "SET passwordHash = :h, mustChangePassword = :m, "
+            "pwdChangedAt = :p, failedAttempts = :f, lockedUntil = :l, updatedAt = :u"
+        ),
+        ExpressionAttributeValues={
+            ':h': hash_password(temp_password),
+            ':m': True,
+            ':p': int(time.time()) - 1,
+            ':f': 0,
+            ':l': 0,
+            ':u': now_iso(),
+        },
+    )
+
+    return {
+        "message": "Temporary password generated successfully.",
+        "userId": pk,
+        "userCode": short_id(pk),
+        "tempPassword": temp_password,
+    }
+
+
 @app.put("/admin/users/{clientId}/assign")
 def assign_coach(clientId: str, payload: AssignPayload, user: dict = Depends(require_roles('ADMIN'))):
     client_pk = make_pk('CLIENT', clientId)
@@ -987,6 +1134,10 @@ def create_template(coachId: str, payload: TemplatePayload, user: dict = Depends
         "workoutDays": clean_text(data.get('workoutDays'), 50) or '',
         "activities": clean_text(data.get('activities'), 50) or f"{len(exercises)} Exercises",
         "exercises": exercises,
+        "level": clean_text(data.get('level'), 50) or '',
+        "estimatedDuration": clean_text(data.get('estimatedDuration'), 50) or '',
+        "equipment": clean_text(data.get('equipment'), 200) or '',
+        "referenceImageKey": clean_text(data.get('referenceImageKey'), 500) or '',
         "createdAt": now,
         "updatedAt": now,
     })
@@ -1594,7 +1745,6 @@ def get_health_metrics(athleteId: str, date: Optional[str] = None, user: dict = 
         raise HTTPException(status_code=403, detail="Forbidden.")
 
     day = date if date and re.match(r'^\d{4}-\d{2}-\d{2}$', date) else datetime.now(timezone.utc).strftime('%Y-%m-%d')
-    item = get_profile.__wrapped__(client_pk) if hasattr(get_profile, '__wrapped__') else None
     try:
         result = table.get_item(Key={'PK': client_pk, 'SK': f"HEALTH#{day}"})
         snapshot = result.get('Item') or {}
@@ -1609,6 +1759,480 @@ def get_health_metrics(athleteId: str, date: Optional[str] = None, user: dict = 
         "hydration": snapshot.get('hydration'),
         "updatedAt": snapshot.get('updatedAt'),
     })
+
+
+# ---------------------------------------------------------------------------
+# WORKOUT IMAGE IMPORT  (coach uploads an image; Claude AI extracts the data)
+# ---------------------------------------------------------------------------
+
+WORKOUT_IMAGE_TYPES = {
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/webp': '.webp',
+    'image/heic': '.heic',
+    'image/heif': '.heif',
+}
+MAX_WORKOUT_IMAGE_BYTES = 15 * 1024 * 1024  # 15 MB
+
+
+@app.post("/coach/{coachId}/templates/import/upload-url")
+def workout_image_upload_url(
+    coachId: str,
+    payload: WorkoutImageUploadPayload,
+    user: dict = Depends(require_roles('COACH', 'ADMIN')),
+):
+    """Step 1 – return a presigned POST so the browser can upload the workout image directly to S3."""
+    coach_pk = make_pk('COACH', coachId)
+    authorize_coach_scope(user, coach_pk)
+
+    if not CLIENT_MEDIA_BUCKET:
+        raise HTTPException(status_code=503, detail='Image storage is not configured.')
+    if payload.contentType not in WORKOUT_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail='Unsupported image type.')
+
+    ext = WORKOUT_IMAGE_TYPES[payload.contentType]
+    object_key = f"coaches/{short_id(coach_pk)}/workout-images/{uuid.uuid4().hex}{ext}"
+
+    try:
+        post = s3.generate_presigned_post(
+            Bucket=CLIENT_MEDIA_BUCKET,
+            Key=object_key,
+            Fields={'Content-Type': payload.contentType},
+            Conditions=[
+                {'Content-Type': payload.contentType},
+                ['content-length-range', 1, MAX_WORKOUT_IMAGE_BYTES],
+                ['starts-with', '$key', f'coaches/{short_id(coach_pk)}/workout-images/'],
+            ],
+            ExpiresIn=300,
+        )
+    except ClientError:
+        raise HTTPException(status_code=503, detail='Unable to prepare image upload.')
+
+    return {
+        'uploadUrl': post['url'],
+        'fields': post['fields'],
+        'objectKey': object_key,
+        'expiresIn': 300,
+    }
+
+
+@app.post("/coach/{coachId}/templates/import/generate")
+def workout_image_generate(
+    coachId: str,
+    request_body: Dict[str, Any],
+    user: dict = Depends(require_roles('COACH', 'ADMIN')),
+):
+    """Step 2 – read the uploaded image from S3 and call Claude to extract workout data."""
+    import urllib.request as _urllib_request
+
+    coach_pk = make_pk('COACH', coachId)
+    authorize_coach_scope(user, coach_pk)
+
+    object_key = request_body.get('objectKey', '')
+    if not object_key or not object_key.startswith(f'coaches/{short_id(coach_pk)}/workout-images/'):
+        raise HTTPException(status_code=403, detail='Invalid image reference.')
+
+    if not CLIENT_MEDIA_BUCKET:
+        raise HTTPException(status_code=503, detail='Image storage is not configured.')
+
+    # Fetch the image bytes from S3
+    try:
+        s3_obj = s3.get_object(Bucket=CLIENT_MEDIA_BUCKET, Key=object_key)
+        image_bytes = s3_obj['Body'].read()
+        content_type = s3_obj.get('ContentType', 'image/jpeg')
+    except ClientError:
+        raise HTTPException(status_code=404, detail='Uploaded image not found. Please upload again.')
+
+    if len(image_bytes) > MAX_WORKOUT_IMAGE_BYTES:
+        raise HTTPException(status_code=400, detail='Image too large.')
+
+    image_b64 = base64.b64encode(image_bytes).decode('utf-8')
+
+    # Call Anthropic Claude API to extract workout data
+    anthropic_api_key = os.environ.get('ANTHROPIC_API_KEY')
+    if not anthropic_api_key:
+        raise HTTPException(status_code=503, detail='AI service is not configured.')
+
+    prompt = (
+        "You are a professional fitness data extractor. Analyse this workout image and return ONLY valid JSON "
+        "with no markdown, no explanation, no code fences. Extract every detail you can see.\n\n"
+        "Return this exact JSON structure (use empty string or null for missing fields):\n"
+        "{\n"
+        '  "title": "",\n'
+        '  "description": "",\n'
+        '  "goal": "",\n'
+        '  "level": "",\n'
+        '  "workoutDays": "",\n'
+        '  "estimatedDuration": "",\n'
+        '  "equipment": "",\n'
+        '  "exercises": [\n'
+        '    {\n'
+        '      "order": 1,\n'
+        '      "name": "",\n'
+        '      "sets": "",\n'
+        '      "reps": "",\n'
+        '      "rest": "",\n'
+        '      "tempo": "",\n'
+        '      "weight": "",\n'
+        '      "rpe": "",\n'
+        '      "notes": ""\n'
+        '    }\n'
+        '  ]\n'
+        "}\n\n"
+        "Be precise. Preserve the exact exercise names, set/rep schemes, and any notes visible in the image."
+    )
+
+    request_payload = json.dumps({
+        "model": "claude-opus-4-5",
+        "max_tokens": 4096,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": content_type,
+                            "data": image_b64,
+                        },
+                    },
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ],
+    }).encode('utf-8')
+
+    req = _urllib_request.Request(
+        'https://api.anthropic.com/v1/messages',
+        data=request_payload,
+        headers={
+            'Content-Type': 'application/json',
+            'x-api-key': anthropic_api_key,
+            'anthropic-version': '2023-06-01',
+        },
+        method='POST',
+    )
+
+    try:
+        with _urllib_request.urlopen(req, timeout=60) as resp:
+            response_data = json.loads(resp.read().decode('utf-8'))
+    except Exception as exc:
+        logger.error("Anthropic API error: %s", exc)
+        raise HTTPException(status_code=502, detail='AI extraction service unavailable. Please try again.')
+
+    raw_text = ''
+    for block in response_data.get('content', []):
+        if block.get('type') == 'text':
+            raw_text += block['text']
+
+    # Strip any accidental markdown fences
+    cleaned = raw_text.strip()
+    if cleaned.startswith('```'):
+        cleaned = '\n'.join(cleaned.split('\n')[1:])
+    if cleaned.endswith('```'):
+        cleaned = '\n'.join(cleaned.split('\n')[:-1])
+    cleaned = cleaned.strip()
+
+    try:
+        extracted = json.loads(cleaned)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=502, detail='AI returned unparseable data. Please try a clearer image.')
+
+    return {
+        'objectKey': object_key,
+        'extracted': extracted,
+    }
+
+
+@app.post("/coach/{coachId}/templates/import/approve")
+def workout_image_approve(
+    coachId: str,
+    request_body: Dict[str, Any],
+    user: dict = Depends(require_roles('COACH', 'ADMIN')),
+):
+    """Step 3 – save the approved (possibly edited) template to the database."""
+    coach_pk = make_pk('COACH', coachId)
+    authorize_coach_scope(user, coach_pk)
+
+    data = request_body.get('template', {})
+    object_key = request_body.get('objectKey', '')
+
+    exercises = clean_exercises(data.get('exercises')) or []
+    now = now_iso()
+    item = to_dynamo({
+        'PK': coach_pk,
+        'SK': f'TEMPLATE#tpl_{uuid.uuid4().hex[:8]}',
+        'type': 'TEMPLATE',
+        'title': clean_text(data.get('title'), 100) or 'Imported Template',
+        'description': clean_text(data.get('description'), 500) or '',
+        'goal': clean_text(data.get('goal'), 50) or 'General Fitness',
+        'workoutDays': clean_text(data.get('workoutDays'), 50) or '',
+        'activities': clean_text(data.get('activities'), 50) or f'{len(exercises)} Exercises',
+        'exercises': exercises,
+        'level': clean_text(data.get('level'), 50) or '',
+        'estimatedDuration': clean_text(data.get('estimatedDuration'), 50) or '',
+        'equipment': clean_text(data.get('equipment'), 200) or '',
+        'referenceImageKey': clean_text(object_key, 500) if object_key else '',
+        'createdAt': now,
+        'updatedAt': now,
+    })
+    table.put_item(Item=item)
+    return {'message': 'Template saved', 'template': template_out(item)}
+
+
+# ---------------------------------------------------------------------------
+# TEMPLATE IMAGE VIEWER  (presigned URL for viewing reference image in iframe)
+# ---------------------------------------------------------------------------
+
+@app.get("/coach/templates/{templateId}/image-view")
+def get_template_image_view(
+    templateId: str,
+    coachId: Optional[str] = None,
+    user: dict = Depends(require_roles('COACH', 'ADMIN')),
+):
+    """Return a short-lived presigned URL for viewing the template reference image."""
+    item = find_template(templateId, template_owner(user, coachId))
+    if not item:
+        raise HTTPException(status_code=404, detail='Template not found.')
+    key = item.get('referenceImageKey', '')
+    if not key or not CLIENT_MEDIA_BUCKET:
+        raise HTTPException(status_code=404, detail='No reference image for this template.')
+    try:
+        url = s3.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': CLIENT_MEDIA_BUCKET, 'Key': key},
+            ExpiresIn=3600,
+        )
+    except ClientError:
+        raise HTTPException(status_code=503, detail='Could not generate image URL.')
+    return {'viewUrl': url, 'objectKey': key}
+
+
+# ---------------------------------------------------------------------------
+# ASSIGN TEMPLATE TO CLIENT  (creates a client schedule from a template)
+# ---------------------------------------------------------------------------
+
+@app.post("/coach/{coachId}/templates/{templateId}/assign")
+def assign_template_to_client(
+    coachId: str,
+    templateId: str,
+    payload: AssignTemplatePayload,
+    user: dict = Depends(require_roles('COACH', 'ADMIN')),
+):
+    """Assign a template to a client – creates a CLIENT schedule record."""
+    coach_pk = make_pk('COACH', coachId)
+    authorize_coach_scope(user, coach_pk)
+
+    template_item = find_template(templateId, coach_pk)
+    if not template_item:
+        raise HTTPException(status_code=404, detail='Template not found.')
+
+    # Verify the client belongs to this coach
+    client_pk = make_pk('CLIENT', payload.clientId)
+    client_profile = get_profile(client_pk)
+    if not client_profile or client_profile.get('role') != 'CLIENT':
+        raise HTTPException(status_code=404, detail='Client not found.')
+    if client_profile.get('coachId') != coach_pk:
+        raise HTTPException(status_code=403, detail='This client is not assigned to you.')
+
+    start_date = payload.startDate or now_iso()[:10]
+    assignment_id = f'asgn_{uuid.uuid4().hex[:8]}'
+    now = now_iso()
+
+    # Snapshot the template exercises into the assignment
+    schedule_item = to_dynamo({
+        'PK': client_pk,
+        'SK': f'SCHEDULE#{assignment_id}',
+        'type': 'CLIENT_SCHEDULE',
+        'assignmentId': assignment_id,
+        'templateId': templateId,
+        'templateTitle': template_item.get('title', ''),
+        'coachId': coach_pk,
+        'startDate': start_date,
+        'notes': clean_text(payload.notes, 500) or '',
+        'exercises': template_item.get('exercises', []),
+        'workoutDays': template_item.get('workoutDays', ''),
+        'goal': template_item.get('goal', ''),
+        'level': template_item.get('level', ''),
+        'estimatedDuration': template_item.get('estimatedDuration', ''),
+        'equipment': template_item.get('equipment', ''),
+        'referenceImageKey': template_item.get('referenceImageKey', ''),
+        'status': 'ACTIVE',
+        'createdAt': now,
+        'updatedAt': now,
+    })
+    table.put_item(Item=schedule_item)
+
+    return {
+        'message': 'Template assigned successfully.',
+        'assignmentId': assignment_id,
+        'clientId': payload.clientId,
+        'startDate': start_date,
+    }
+
+
+@app.get("/coach/{coachId}/clients/{clientId}/schedules")
+def get_client_schedules(
+    coachId: str,
+    clientId: str,
+    user: dict = Depends(require_roles('COACH', 'ADMIN')),
+):
+    """Coach: list all schedules assigned to a specific client."""
+    coach_pk = make_pk('COACH', coachId)
+    authorize_coach_scope(user, coach_pk)
+
+    client_pk = make_pk('CLIENT', clientId)
+    client_profile = get_profile(client_pk)
+    if not client_profile or client_profile.get('role') != 'CLIENT':
+        raise HTTPException(status_code=404, detail='Client not found.')
+    if client_profile.get('coachId') != coach_pk:
+        raise HTTPException(status_code=403, detail='This client is not assigned to you.')
+
+    items = query_all(
+        KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with('SCHEDULE#')
+    )
+    return {'schedules': [_schedule_out(i) for i in items]}
+
+
+def _schedule_out(item: dict) -> dict:
+    """Serialize a CLIENT_SCHEDULE DynamoDB item for API responses."""
+    out = parse_decimals({
+        'assignmentId': item.get('assignmentId', ''),
+        'templateId': item.get('templateId', ''),
+        'templateTitle': item.get('templateTitle', ''),
+        'startDate': item.get('startDate', ''),
+        'notes': item.get('notes', ''),
+        'exercises': item.get('exercises', []),
+        'workoutDays': item.get('workoutDays', ''),
+        'goal': item.get('goal', ''),
+        'level': item.get('level', ''),
+        'estimatedDuration': item.get('estimatedDuration', ''),
+        'equipment': item.get('equipment', ''),
+        'referenceImageKey': item.get('referenceImageKey', ''),
+        'status': item.get('status', 'ACTIVE'),
+        'createdAt': item.get('createdAt', ''),
+    })
+    if out.get('referenceImageKey') and CLIENT_MEDIA_BUCKET:
+        try:
+            out['referenceImageUrl'] = s3.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': CLIENT_MEDIA_BUCKET, 'Key': out['referenceImageKey']},
+                ExpiresIn=3600,
+            )
+        except Exception:
+            out['referenceImageUrl'] = None
+    else:
+        out['referenceImageUrl'] = None
+    return out
+
+
+@app.get("/athlete/{athleteId}/schedules")
+def get_athlete_schedules(
+    athleteId: str,
+    user: dict = Depends(require_roles('CLIENT')),
+):
+    """Client: list their own active schedules."""
+    client_pk = user['pk']
+    authorize_athlete_scope(user, client_pk)
+
+    items = query_all(
+        KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with('SCHEDULE#')
+    )
+    active = [i for i in items if i.get('status', 'ACTIVE') == 'ACTIVE']
+    return {'schedules': [_schedule_out(i) for i in active]}
+
+
+@app.get("/athlete/{athleteId}/schedules/{assignmentId}")
+def get_athlete_schedule_detail(
+    athleteId: str,
+    assignmentId: str,
+    user: dict = Depends(require_roles('CLIENT')),
+):
+    """Client: get full detail of one schedule."""
+    client_pk = user['pk']
+    authorize_athlete_scope(user, client_pk)
+
+    result = table.get_item(Key={'PK': client_pk, 'SK': f'SCHEDULE#{assignmentId}'})
+    item = result.get('Item')
+    if not item:
+        raise HTTPException(status_code=404, detail='Schedule not found.')
+    return _schedule_out(item)
+
+
+# ---------------------------------------------------------------------------
+# S3 IMAGE VIEWER  (presigned URL for any S3 image the coach/client owns)
+# ---------------------------------------------------------------------------
+
+@app.get("/media/view")
+def get_media_view_url(
+    objectKey: str,
+    user: dict = Depends(require_roles('CLIENT', 'COACH', 'ADMIN')),
+):
+    """Return a short-lived presigned GET URL for a media object the caller is authorised to see.
+
+    Security model:
+      CLIENT  → may only view their own files under clients/{their-id}/
+      COACH   → may view their own coach files AND files belonging to their assigned clients
+      ADMIN   → may view any client or coach file
+    Path traversal: keys containing '..' or starting with '/' are rejected before prefix check.
+    """
+    if not CLIENT_MEDIA_BUCKET:
+        raise HTTPException(status_code=503, detail='Media storage is not configured.')
+
+    # Decode once; a second unquote() is intentionally not applied.
+    decoded_key = unquote(objectKey)
+
+    # Reject path-traversal attempts and absolute paths before any prefix check.
+    if '..' in decoded_key or decoded_key.startswith('/'):
+        raise HTTPException(status_code=400, detail='Invalid object key.')
+
+    pk = user['pk']
+    caller_short = short_id(pk)
+    role = user.get('role', '')
+
+    allowed = False
+
+    if role == 'ADMIN':
+        # Admins may view any media stored under the two top-level namespaces.
+        allowed = decoded_key.startswith('clients/') or decoded_key.startswith('coaches/')
+
+    elif role == 'CLIENT':
+        # Clients see only their own files.
+        allowed = decoded_key.startswith(f'clients/{caller_short}/')
+
+    elif role == 'COACH':
+        # Coaches see their own files unconditionally.
+        if decoded_key.startswith(f'coaches/{caller_short}/'):
+            allowed = True
+        # Coaches may also view their assigned clients' media files.
+        # Extract the client short-ID from the key and verify the relationship.
+        elif decoded_key.startswith('clients/'):
+            parts = decoded_key.split('/')          # ['clients', '<client-short-id>', ...]
+            if len(parts) >= 3:
+                key_client_short = parts[1]
+                client_pk = f'CLIENT#{key_client_short}'
+                client_profile = get_profile(client_pk)
+                if (
+                    client_profile
+                    and client_profile.get('role') == 'CLIENT'
+                    and client_profile.get('coachId') in (pk, caller_short)
+                ):
+                    allowed = True
+
+    if not allowed:
+        raise HTTPException(status_code=403, detail='Access denied to this media object.')
+
+    try:
+        url = s3.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': CLIENT_MEDIA_BUCKET, 'Key': decoded_key},
+            ExpiresIn=3600,
+        )
+    except ClientError:
+        raise HTTPException(status_code=503, detail='Could not generate view URL.')
+
+    return {'viewUrl': url, 'objectKey': decoded_key}
 
 
 # Wrap the FastAPI app with Mangum to bridge it to AWS Lambda

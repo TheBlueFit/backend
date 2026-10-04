@@ -8,7 +8,7 @@ Parameters:
     Description: >-
       Websites / apps allowed to call this API from a browser. Add your production web
       domain here and, for phone testing on your Wi-Fi, your dev server address.
-    Default: "http://localhost:3000,capacitor://localhost,http://localhost,https://localhost"
+    Default: "http://localhost:3000,http://localhost,https://localhost"
 
 Globals:
   Function:
@@ -114,7 +114,9 @@ Resources:
               Action:
                 - s3:GetObject
                 - s3:PutObject
-              Resource: !Sub "${ClientMediaBucket.Arn}/clients/*"
+              Resource:
+                - !Sub "${ClientMediaBucket.Arn}/clients/*"
+                - !Sub "${ClientMediaBucket.Arn}/coaches/*"
       Events:
         FastApiCatchAll:
           Type: HttpApi

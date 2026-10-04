@@ -4,4 +4,4 @@
     <string name="title_activity_main">The Blue Fit</string>
     <string name="package_name">com.thebluefit.app</string>
     <string name="custom_url_scheme">com.thebluefit.app</string>
-</resources>
+    <string name="background_notification_title">Measuring your health and fitness data.</string>    <string name="background_notification_description">The app is running in the background.</string>    <string name="privacy_policy_url"/></resources>

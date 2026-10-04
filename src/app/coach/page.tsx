@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { Activity, AlertCircle, CheckCircle2 } from "lucide-react";
 import { GlassCard } from "@/components/GlassCard";
 import CoachTrackerDashboard from "@/components/coach/CoachTrackerDashboard";
-import { dashboardAPI } from "@/services/api";
+import { authSession, dashboardAPI } from "@/services/api";
 
 interface CoachDashboardData {
   stats: any[];
@@ -22,8 +22,19 @@ function getStat(stats: any[], names: string[]): number | undefined {
 }
 
 export default function CoachDashboard() {
+  const [currentUserName, setCurrentUserName] = useState("Coach");
   const [dashboardData, setDashboardData] = useState<CoachDashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const syncCurrentUser = () => {
+      setCurrentUserName(authSession.get()?.name?.trim() || "Coach");
+    };
+
+    syncCurrentUser();
+    window.addEventListener("bluefit:auth-change", syncCurrentUser);
+    return () => window.removeEventListener("bluefit:auth-change", syncCurrentUser);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -79,7 +90,7 @@ export default function CoachDashboard() {
               marginBottom: "8px",
             }}
           >
-            Training pulse
+            {`Welcome, ${currentUserName}`}
           </h2>
 
           <span

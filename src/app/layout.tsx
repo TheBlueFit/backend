@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { authSession, UserSession } from "@/services/api";
+import MobilePermissionsGate from "@/components/shared/MobilePermissionsGate";
 
 type NavItem = {
   href: string;
@@ -349,7 +350,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </button>
           </nav>
 
-          <main className="main-content">{children}</main>
+          <MobilePermissionsGate>
+            <main className="main-content">{children}</main>
+          </MobilePermissionsGate>
         </div>
       </body>
     </html>

@@ -10,6 +10,11 @@ android {
 apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
 dependencies {
     implementation project(':capacitor-app')
+    implementation project(':capacitor-camera')
+    implementation project(':capacitor-health-fitness')
+    implementation project(':capacitor-push-notifications')
+    implementation project(':capgo-capacitor-health')
+    implementation project(':capacitor-native-settings')
 
 }
 

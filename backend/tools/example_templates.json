@@ -1,0 +1,51 @@
+[
+  {
+    "title": "6-Week Hypertrophy Block",
+    "description": "Progressive overload focused on muscle growth with compound + isolation work.",
+    "goal": "Muscle Gain",
+    "level": "Intermediate",
+    "workoutDays": "Mon / Wed / Fri",
+    "estimatedDuration": "60 min",
+    "equipment": "Barbell, Dumbbells, Cable Machine",
+    "exercises": [
+      { "name": "Barbell Back Squat",      "sets": "4", "reps": "8-10", "rpe": "8", "notes": "Pause 1 s at bottom" },
+      { "name": "Romanian Deadlift",        "sets": "3", "reps": "10",   "rpe": "7" },
+      { "name": "Leg Press",               "sets": "3", "reps": "12",   "rpe": "7" },
+      { "name": "Leg Curl (Machine)",       "sets": "3", "reps": "12",   "rpe": "7" },
+      { "name": "Calf Raise",              "sets": "4", "reps": "15",   "rpe": "8" }
+    ]
+  },
+  {
+    "title": "Fat Loss Cardio Circuit",
+    "description": "High-intensity circuit designed to maximise caloric burn in 45 minutes.",
+    "goal": "Fat Loss",
+    "level": "Beginner",
+    "workoutDays": "Tue / Thu / Sat",
+    "estimatedDuration": "45 min",
+    "equipment": "Bodyweight, Resistance Bands",
+    "exercises": [
+      { "name": "Jump Squat",              "sets": "4", "reps": "15",   "rpe": "8" },
+      { "name": "Push-up",                 "sets": "3", "reps": "12",   "rpe": "7" },
+      { "name": "Mountain Climber",        "sets": "3", "reps": "30 s", "rpe": "8" },
+      { "name": "Band Pull-Apart",         "sets": "3", "reps": "20",   "rpe": "6" },
+      { "name": "Burpee",                  "sets": "3", "reps": "10",   "rpe": "9" }
+    ]
+  },
+  {
+    "title": "Upper/Lower Split — Strength",
+    "description": "4-day upper/lower strength split for intermediate lifters.",
+    "goal": "Strength",
+    "level": "Intermediate",
+    "workoutDays": "Mon / Tue / Thu / Fri",
+    "estimatedDuration": "75 min",
+    "equipment": "Barbell, Dumbbells, Pull-up Bar",
+    "exercises": [
+      { "name": "Bench Press",             "sets": "5", "reps": "5",    "rpe": "8" },
+      { "name": "Weighted Pull-up",        "sets": "4", "reps": "6",    "rpe": "8" },
+      { "name": "Overhead Press",          "sets": "4", "reps": "6",    "rpe": "8" },
+      { "name": "Barbell Row",             "sets": "4", "reps": "6",    "rpe": "7" },
+      { "name": "Deadlift",               "sets": "3", "reps": "5",    "rpe": "9" },
+      { "name": "Front Squat",             "sets": "4", "reps": "5",    "rpe": "8" }
+    ]
+  }
+]

@@ -104,7 +104,7 @@
 //         {/* Header */}
 //         <div className="section-header" style={{ justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
 //           <div>
-//             <h1 className="glazy-title" style={{ fontSize: '32px', textTransform: 'none', marginBottom: '8px', margin: 0 }}>Master Admin Portal</h1>
+//             <h1 className="glazy-title" style={{ fontSize: '32px', textTransform: 'none', marginBottom: '8px', margin: 0 }}>{`Welcome, ${currentUserName}`}</h1>
 //             <p className="label-text" style={{ textTransform: 'none', color: 'var(--text-secondary)', letterSpacing: '0', fontSize: '14px', margin: 0 }}>Global system oversight, user access management, and core services.</p>
 //           </div>
 //           <button 
@@ -286,9 +286,10 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Users, Activity, Database, Plus, Edit2, Trash2, Key, PieChart, Utensils, X, Save, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
-import { dashboardAPI } from '@/services/api';
+import { authSession, dashboardAPI } from '@/services/api';
 
 export default function AdminDashboard() {
+  const [currentUserName, setCurrentUserName] = useState("Administrator");
   const [activeTab, setActiveTab] = useState<'users' | 'services' | 'analytics'>('users');
   const [dbUsers, setDbUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -300,6 +301,16 @@ export default function AdminDashboard() {
   const [isSaving, setIsSaving] = useState(false);
   const [resetResult, setResetResult] = useState<{ userCode: string; tempPassword: string } | null>(null);
   const [isResetting, setIsResetting] = useState(false);
+
+  useEffect(() => {
+    const syncCurrentUser = () => {
+      setCurrentUserName(authSession.get()?.name?.trim() || "Administrator");
+    };
+
+    syncCurrentUser();
+    window.addEventListener("bluefit:auth-change", syncCurrentUser);
+    return () => window.removeEventListener("bluefit:auth-change", syncCurrentUser);
+  }, []);
 
   // Fetch live users from DynamoDB on mount
   useEffect(() => {
@@ -415,7 +426,7 @@ export default function AdminDashboard() {
           
           <div className="section-header" style={{ justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
             <div>
-              <h1 className="glazy-title" style={{ fontSize: '32px', textTransform: 'none', marginBottom: '8px', margin: 0 }}>Master Admin Portal</h1>
+              <h1 className="glazy-title" style={{ fontSize: '32px', textTransform: 'none', marginBottom: '8px', margin: 0 }}>{`Welcome, ${currentUserName}`}</h1>
               <p className="label-text" style={{ textTransform: 'none', color: 'var(--text-secondary)', letterSpacing: '0', fontSize: '14px', margin: 0 }}>Global system oversight, user access management, and core services.</p>
             </div>
             <button 

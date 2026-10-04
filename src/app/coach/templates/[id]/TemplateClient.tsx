@@ -1,193 +1,61 @@
 "use client";
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Save, Plus, GripVertical, Trash2 } from 'lucide-react';
-import Link from 'next/link';
-import { useParams, useSearchParams } from 'next/navigation';
-import { dashboardAPI } from '@/services/api';
 
-type Exercise = { id: string; name: string; sets: string; reps: string; rpe: string };
+import React, { useEffect, useState } from "react";
+import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { useParams, useSearchParams } from "next/navigation";
+import { dashboardAPI } from "@/services/api";
 
-const fieldStyle: React.CSSProperties = {
-  background: 'rgba(0,0,0,0.4)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: '8px',
-  color: '#fff',
-  padding: '8px 10px',
-  fontSize: '13px',
-  outline: 'none',
-  minWidth: 0,
-};
+interface Exercise { id: string; order: number; section: string; type: string; name: string; sets: string; reps: string; rest: string; tempo: string; weight: string; rpe: string; notes: string; }
+const fieldStyle: React.CSSProperties = { width: "100%", minWidth: 0, boxSizing: "border-box", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border-subtle)", borderRadius: 8, color: "#fff", padding: "8px 10px", fontSize: 12, outline: "none" };
 
 export default function TemplateClient() {
-  // Works for both /coach/templates/edit?id=... (works in the static app) and the older /coach/templates/[id]
   const params = useParams<{ id?: string }>();
   const search = useSearchParams();
-  const templateId = search.get('id') || params?.id || '';
-
-  const [title, setTitle] = useState('');
-  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const templateId = search.get("id") || params?.id || "";
+  const [template, setTemplate] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
   useEffect(() => {
-    if (!templateId) {
-      setMessage({ type: 'error', text: 'No template selected.' });
-      setIsLoading(false);
-      return;
-    }
+    if (!templateId) { setMessage({ type: "error", text: "No template selected." }); setIsLoading(false); return; }
     let cancelled = false;
     (async () => {
       try {
         const t = await dashboardAPI.getTemplate(templateId);
         if (cancelled) return;
-        setTitle(t.title || '');
-        setExercises(
-          (t.exercises || []).map((e: any, i: number) => ({
-            id: String(e.id || i + 1),
-            name: e.name || '',
-            sets: String(e.sets ?? ''),
-            reps: String(e.reps ?? ''),
-            rpe: String(e.rpe ?? ''),
-          }))
-        );
-      } catch (err: any) {
-        if (!cancelled) setMessage({ type: 'error', text: err.message || 'Could not load this template.' });
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
+        setTemplate({ ...t, exercises: (t.exercises || []).map((e: any, i: number) => ({ id: String(e.id || i + 1), order: Number(e.order || i + 1), section: String(e.section || ""), type: String(e.type || ""), name: String(e.name || ""), sets: String(e.sets ?? ""), reps: String(e.reps ?? ""), rest: String(e.rest || ""), tempo: String(e.tempo || ""), weight: String(e.weight || ""), rpe: String(e.rpe ?? ""), notes: String(e.notes || "") })) });
+      } catch (err: any) { if (!cancelled) setMessage({ type: "error", text: err.message || "Could not load this template." }); }
+      finally { if (!cancelled) setIsLoading(false); }
     })();
     return () => { cancelled = true; };
   }, [templateId]);
 
-  const updateExercise = (id: string, patch: Partial<Exercise>) =>
-    setExercises((list) => list.map((e) => (e.id === id ? { ...e, ...patch } : e)));
-
-  const addExercise = () =>
-    setExercises((list) => [...list, { id: String(Date.now()), name: '', sets: '3', reps: '8-10', rpe: '7' }]);
-
-  const removeExercise = (id: string) => setExercises((list) => list.filter((e) => e.id !== id));
+  const update = (patch: Record<string, any>) => setTemplate((t: any) => ({ ...(t || {}), ...patch }));
+  const updateExercise = (index: number, patch: Partial<Exercise>) => setTemplate((t: any) => ({ ...t, exercises: t.exercises.map((e: Exercise, i: number) => i === index ? { ...e, ...patch } : e) }));
+  const addExercise = () => setTemplate((t: any) => ({ ...t, exercises: [...t.exercises, { id: String(Date.now()), order: t.exercises.length + 1, section: "", type: "", name: "", sets: "3", reps: "8-12", rest: "", tempo: "", weight: "", rpe: "", notes: "" }] }));
+  const removeExercise = (index: number) => setTemplate((t: any) => ({ ...t, exercises: t.exercises.filter((_: any, i: number) => i !== index).map((e: any, i: number) => ({ ...e, order: i + 1 })) }));
 
   const save = async () => {
-    setIsSaving(true);
-    setMessage(null);
+    if (!templateId || !template) return;
+    setIsSaving(true); setMessage(null);
     try {
-      await dashboardAPI.updateTemplate(templateId, {
-        title,
-        exercises: exercises.filter((e) => e.name.trim()),
-      });
-      setMessage({ type: 'ok', text: 'Template saved.' });
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'Could not save this template.' });
-    } finally {
-      setIsSaving(false);
-    }
+      const saved = await dashboardAPI.updateTemplate(templateId, { title: template.title, description: template.description, goal: template.goal, level: template.level, workoutDays: template.workoutDays, estimatedDuration: template.estimatedDuration, equipment: template.equipment, activities: `${template.exercises.filter((e: Exercise) => e.name.trim()).length} Exercises`, referenceImageKey: template.referenceImageKey, exercises: template.exercises.filter((e: Exercise) => e.name.trim()) });
+      setTemplate(saved); setMessage({ type: "ok", text: "Template saved." });
+    } catch (err: any) { setMessage({ type: "error", text: err.message || "Could not save this template." }); }
+    finally { setIsSaving(false); }
   };
 
-  return (
-    <div className="container" style={{ maxWidth: '800px', paddingBottom: '80px' }}>
-
-      {/* Top Navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-        <Link href="/coach/templates" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', textDecoration: 'none' }}>
-          <ArrowLeft size={20} /> Back to Templates
-        </Link>
-        <button
-          onClick={save}
-          disabled={isSaving || isLoading || !templateId}
-          className="btn-primary"
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '13px', background: 'rgba(0, 226, 123, 0.15)', color: '#00E27B', border: '1px solid rgba(0, 226, 123, 0.4)' }}
-        >
-          <Save size={16} /> {isSaving ? 'Saving...' : 'Save Changes'}
-        </button>
-      </div>
-
-      <div className="app-card fade-in">
-        <h1 className="animated-gradient-text" style={{ fontSize: '24px', margin: '0 0 8px 0' }}>Template Configuration</h1>
-
-        {message && (
-          <div
-            className={message.type === 'error' ? 'error-banner' : undefined}
-            style={message.type === 'ok' ? { color: '#00E27B', marginBottom: '16px', fontSize: '14px' } : undefined}
-          >
-            {message.text}
-          </div>
-        )}
-
-        {isLoading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>Loading Configuration...</div>
-        ) : !templateId || (message?.type === 'error' && exercises.length === 0 && !title) ? null : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
-
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              maxLength={100}
-              placeholder="Template name"
-              aria-label="Template name"
-              style={{ ...fieldStyle, fontSize: '16px', padding: '12px 14px' }}
-            />
-
-            {exercises.map((ex, index) => (
-              <div key={ex.id} style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                flexWrap: 'wrap',
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                padding: '16px',
-                borderRadius: '12px'
-              }}>
-                <GripVertical size={20} color="var(--text-secondary)" style={{ cursor: 'grab' }} />
-                <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
-                  <input
-                    value={ex.name}
-                    onChange={(e) => updateExercise(ex.id, { name: e.target.value })}
-                    maxLength={100}
-                    placeholder={`${index + 1}. Exercise name`}
-                    aria-label={`Exercise ${index + 1} name`}
-                    style={fieldStyle}
-                  />
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input value={ex.sets} onChange={(e) => updateExercise(ex.id, { sets: e.target.value })} maxLength={10} placeholder="Sets" aria-label="Sets" style={{ ...fieldStyle, width: '33%' }} />
-                    <input value={ex.reps} onChange={(e) => updateExercise(ex.id, { reps: e.target.value })} maxLength={10} placeholder="Reps" aria-label="Reps" style={{ ...fieldStyle, width: '33%' }} />
-                    <input value={ex.rpe} onChange={(e) => updateExercise(ex.id, { rpe: e.target.value })} maxLength={10} placeholder="RPE" aria-label="RPE" style={{ ...fieldStyle, width: '33%' }} />
-                  </div>
-                </div>
-                <button
-                  onClick={() => removeExercise(ex.id)}
-                  aria-label={`Remove exercise ${index + 1}`}
-                  style={{ background: 'transparent', border: 'none', color: '#FF453A', cursor: 'pointer', padding: '8px' }}
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            ))}
-
-            <button
-              onClick={addExercise}
-              style={{
-                width: '100%',
-                padding: '16px',
-                background: 'transparent',
-                border: '1px dashed rgba(255, 255, 255, 0.2)',
-                borderRadius: '12px',
-                color: 'var(--text-secondary)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                marginTop: '8px'
-              }}
-            >
-              <Plus size={18} /> Add Exercise
-            </button>
-
-          </div>
-        )}
-      </div>
+  return <div className="container" style={{ maxWidth: "1000px", paddingBottom: 80 }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, gap: 12 }}><Link href="/coach/templates" style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-secondary)", textDecoration: "none", fontSize: 12 }}><ArrowLeft size={18} /> Back to Templates</Link><button onClick={save} disabled={isSaving || isLoading || !templateId} className="btn-primary" style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 14px", fontSize: 12, background: "rgba(0,226,123,0.1)", color: "#00E27B", border: "1px solid rgba(0,226,123,0.25)" }}><Save size={15} /> {isSaving ? "Saving…" : "Save Changes"}</button></div>
+    <div className="app-card fade-in"><h1 className="animated-gradient-text" style={{ fontSize: 24, margin: "0 0 16px" }}>Template Configuration</h1>{message && <div className={message.type === "error" ? "error-banner" : undefined} style={message.type === "ok" ? { color: "#00E27B", marginBottom: 14, fontSize: 13 } : undefined}>{message.text}</div>}
+      {isLoading ? <div style={{ textAlign: "center", padding: 40, color: "var(--text-secondary)" }}>Loading Configuration...</div> : !template ? null : <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 10 }}>{[["Title","title"],["Goal","goal"],["Level","level"],["Workout days","workoutDays"],["Duration","estimatedDuration"],["Equipment","equipment"]].map(([label,key]) => <label key={key} style={{ display: "flex", flexDirection: "column" }}><span className="label-text" style={{ marginBottom: 6 }}>{label}</span><input value={template[key] || ""} onChange={(e) => update({ [key]: e.target.value })} style={fieldStyle} /></label>)}</div>
+        <label style={{ display: "flex", flexDirection: "column" }}><span className="label-text" style={{ marginBottom: 6 }}>Description</span><textarea rows={3} value={template.description || ""} onChange={(e) => update({ description: e.target.value })} style={{ ...fieldStyle, resize: "vertical" }} /></label>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 6 }}><div><div className="label-text">Exercises</div><div style={{ marginTop: 4, color: "var(--text-secondary)", fontSize: 11 }}>{template.exercises.length} exercise(s)</div></div><button type="button" onClick={addExercise} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", borderRadius: 9, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#fff", cursor: "pointer", fontSize: 11 }}><Plus size={14} /> Add Exercise</button></div>
+        {template.exercises.map((ex: Exercise, index: number) => <div key={ex.id} style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 12 }}><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 8 }}>{[["Section","section"],["Type","type"],["Exercise","name"],["Sets","sets"],["Reps / Time","reps"],["Rest","rest"],["Tempo","tempo"],["Weight","weight"],["RPE","rpe"],["Notes","notes"]].map(([label,key]) => <label key={key} style={{ display: "flex", flexDirection: "column", gridColumn: key === "notes" ? "1 / -1" : undefined }}><span style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-secondary)", marginBottom: 5 }}>{label}</span><input value={(ex as any)[key] || ""} onChange={(e) => updateExercise(index, { [key]: e.target.value } as any)} style={fieldStyle} /></label>)}</div><button type="button" onClick={() => removeExercise(index)} style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 5, background: "transparent", border: 0, color: "#FF453A", cursor: "pointer", fontSize: 11 }}><Trash2 size={13} /> Remove</button></div>)}
+      </div>}
     </div>
-  );
+  </div>;
 }

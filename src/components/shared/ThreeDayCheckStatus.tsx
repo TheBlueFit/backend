@@ -16,6 +16,7 @@ import {
   ThreeDayCheckStatus as CheckStatusData,
   ThreeDayDayStatus,
 } from "@/services/api";
+import MediaViewerModal from "@/components/shared/MediaViewerModal";
 
 const DAYS = [1, 2, 3];
 const MEALS = ["Breakfast", "Brunch", "Lunch", "Snacks", "Dinner"];
@@ -47,6 +48,8 @@ export default function ThreeDayCheckStatus({ mode, clientId }: Props) {
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Photo to display in the in-app MediaViewerModal — objectKey + display title. */
+  const [viewerPhoto, setViewerPhoto] = useState<{ objectKey: string; title: string } | null>(null);
 
   const load = async () => {
     setIsLoading(true);
@@ -180,6 +183,7 @@ export default function ThreeDayCheckStatus({ mode, clientId }: Props) {
   if (!data) return null;
 
   return (
+    <>
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <section className="app-card" style={{ padding: 24 }}>
         <div className="section-header" style={{ marginBottom: 18 }}>
@@ -288,10 +292,26 @@ export default function ThreeDayCheckStatus({ mode, clientId }: Props) {
                     </label>
                   ) : null}
 
-                  {photo && photo.viewUrl ? (
-                    <a href={photo.viewUrl} target="_blank" rel="noreferrer" className="btn-secondary" style={{ display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none" }}>
+                  {photo && (photo.objectKey || photo.viewUrl) ? (
+                    // Open in-app viewer — never navigate to a raw S3 URL in a new tab
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer" }}
+                      onClick={() => {
+                        if (photo.objectKey) {
+                          setViewerPhoto({
+                            objectKey: photo.objectKey,
+                            title: `${photo.meal} · Day ${photo.day}`,
+                          });
+                        } else if (photo.viewUrl) {
+                          // Fallback for older records that only have viewUrl stored
+                          window.open(photo.viewUrl, "_blank", "noopener,noreferrer");
+                        }
+                      }}
+                    >
                       <ImageIcon size={14} /> View photo
-                    </a>
+                    </button>
                   ) : mode === "COACH" && !photo ? (
                     <span style={{ fontSize: 10, color: "var(--text-secondary)" }}>No photo uploaded.</span>
                   ) : (
@@ -316,5 +336,15 @@ export default function ThreeDayCheckStatus({ mode, clientId }: Props) {
         </div>
       )}
     </div>
+
+    {/* In-app photo viewer — replaces opening a raw S3 URL in a browser tab */}
+    {viewerPhoto && (
+      <MediaViewerModal
+        objectKey={viewerPhoto.objectKey}
+        title={viewerPhoto.title}
+        onClose={() => setViewerPhoto(null)}
+      />
+    )}
+  </>
   );
 }
