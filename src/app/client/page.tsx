@@ -21,6 +21,7 @@ interface AthleteData {
   recovery?: number;
   calories?: number;
   workoutsThisWeek?: number;
+  heartRate?: number;
   assignedSchedules?: any[];
 }
 
@@ -102,6 +103,7 @@ export default function AthleteDashboard() {
           workoutCompletion={athleteData?.workoutCompletion}
           recovery={athleteData?.recovery}
           calories={athleteData?.calories}
+          heartRate={athleteData?.heartRate}
           workoutsThisWeek={athleteData?.workoutsThisWeek}
         />
 

@@ -235,6 +235,14 @@ async function openNativeSettings(): Promise<void> {
 }
 
 const STORAGE_KEY = "bluefit_permissions_v1";
+const GATE_DONE_KEY = "bluefit_gate_done_v1";
+
+function isGateDone(): boolean {
+  try { return localStorage.getItem(GATE_DONE_KEY) === "1"; } catch { return false; }
+}
+function markGateDone() {
+  try { localStorage.setItem(GATE_DONE_KEY, "1"); } catch {}
+}
 
 function loadStoredPermissions(): Partial<PermissionStates> {
   try {
@@ -314,7 +322,8 @@ export default function MobilePermissionsGate({ children }: GateProps) {
       const merged: PermissionStates = { ...defaultPermissions, ...stored };
       setPermissions(merged);
 
-      if (alreadyGranted(merged)) {
+      // Fix 1: If user has already been through the gate once, never show it again
+      if (isGateDone() || alreadyGranted(merged)) {
         setGateDone(true);
       } else {
         setShowGate(true);
@@ -357,6 +366,7 @@ export default function MobilePermissionsGate({ children }: GateProps) {
     setRequesting(false);
     setGateDone(true);
     setShowGate(false);
+    markGateDone();
   }, [permissions, requestSingle]);
 
   const requestPermission = useCallback(async (key: keyof PermissionStates) => {
@@ -503,7 +513,7 @@ export default function MobilePermissionsGate({ children }: GateProps) {
 
             {/* Skip / Continue anyway */}
             <button
-              onClick={() => { setGateDone(true); setShowGate(false); savePermissions(permissions); }}
+              onClick={() => { setGateDone(true); setShowGate(false); savePermissions(permissions); markGateDone(); }}
               disabled={requesting}
               style={{
                 width: "100%",

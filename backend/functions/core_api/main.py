@@ -394,13 +394,40 @@ def clean_text(value: Optional[str], limit: int) -> Optional[str]:
 
 
 def clean_exercises(exercises: Optional[List[Dict[str, Any]]]) -> Optional[List[Dict[str, str]]]:
+    """Normalize imported/manual exercise rows without dropping workout instructions."""
     if exercises is None:
         return None
     if len(exercises) > 100:
         raise HTTPException(status_code=400, detail="Too many exercises (max 100).")
-    cleaned = []
-    for ex in exercises:
-        cleaned.append({k: (clean_text(str(ex.get(k, '')), 100) or '') for k in ('id', 'name', 'sets', 'reps', 'rpe')})
+
+    fields = {
+        'id': 100,
+        'order': 20,
+        'section': 100,
+        'type': 100,
+        'name': 150,
+        'sets': 100,
+        'reps': 100,
+        'rest': 100,
+        'tempo': 100,
+        'weight': 100,
+        'rpe': 100,
+        'notes': 500,
+    }
+
+    cleaned: List[Dict[str, str]] = []
+    for index, ex in enumerate(exercises, start=1):
+        if not isinstance(ex, dict):
+            raise HTTPException(status_code=400, detail=f"Exercise {index} must be an object.")
+        row: Dict[str, str] = {}
+        for key, limit in fields.items():
+            value = ex.get(key, '')
+            row[key] = clean_text(str(value), limit) or ''
+        if not row['id']:
+            row['id'] = str(index)
+        if not row['order']:
+            row['order'] = str(index)
+        cleaned.append(row)
     return cleaned
 
 
@@ -506,7 +533,7 @@ def next_user_id(role: str, name: str) -> str:
         m = pattern.match(str(profile.get('PK', '')))
         if m:
             highest = max(highest, int(m.group(1)))
-    return f"{role}#{code_prefix}{highest + 1:03d}"
+    return f"{role}#{code_prefix}{highest + 1:04d}"
 
 
 # ------------------------------ request models -----------------------------
@@ -578,10 +605,6 @@ class TemplatePayload(BaseModel):
     equipment: Optional[str] = None
     referenceImageKey: Optional[str] = None
 
-
-class WorkoutImageUploadPayload(BaseModel):
-    fileName: str
-    contentType: str
 
 
 class AssignTemplatePayload(BaseModel):
@@ -676,9 +699,8 @@ def three_day_status(client_pk: str) -> dict:
             'meal': item.get('meal', ''),
             'originalFileName': item.get('originalFileName', ''),
             'contentType': item.get('contentType', ''),
-            'objectKey': item.get('objectKey', ''),   # ← added: lets frontend use /media/view
             'uploadedAt': item.get('uploadedAt', item.get('createdAt', '')),
-            'viewUrl': view_url,                       # kept for backwards compat; not used as href
+            'viewUrl': view_url,
         })
 
     output_days = []
@@ -1745,6 +1767,7 @@ def get_health_metrics(athleteId: str, date: Optional[str] = None, user: dict = 
         raise HTTPException(status_code=403, detail="Forbidden.")
 
     day = date if date and re.match(r'^\d{4}-\d{2}-\d{2}$', date) else datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    item = get_profile.__wrapped__(client_pk) if hasattr(get_profile, '__wrapped__') else None
     try:
         result = table.get_item(Key={'PK': client_pk, 'SK': f"HEALTH#{day}"})
         snapshot = result.get('Item') or {}
@@ -1759,226 +1782,6 @@ def get_health_metrics(athleteId: str, date: Optional[str] = None, user: dict = 
         "hydration": snapshot.get('hydration'),
         "updatedAt": snapshot.get('updatedAt'),
     })
-
-
-# ---------------------------------------------------------------------------
-# WORKOUT IMAGE IMPORT  (coach uploads an image; Claude AI extracts the data)
-# ---------------------------------------------------------------------------
-
-WORKOUT_IMAGE_TYPES = {
-    'image/jpeg': '.jpg',
-    'image/png': '.png',
-    'image/webp': '.webp',
-    'image/heic': '.heic',
-    'image/heif': '.heif',
-}
-MAX_WORKOUT_IMAGE_BYTES = 15 * 1024 * 1024  # 15 MB
-
-
-@app.post("/coach/{coachId}/templates/import/upload-url")
-def workout_image_upload_url(
-    coachId: str,
-    payload: WorkoutImageUploadPayload,
-    user: dict = Depends(require_roles('COACH', 'ADMIN')),
-):
-    """Step 1 – return a presigned POST so the browser can upload the workout image directly to S3."""
-    coach_pk = make_pk('COACH', coachId)
-    authorize_coach_scope(user, coach_pk)
-
-    if not CLIENT_MEDIA_BUCKET:
-        raise HTTPException(status_code=503, detail='Image storage is not configured.')
-    if payload.contentType not in WORKOUT_IMAGE_TYPES:
-        raise HTTPException(status_code=400, detail='Unsupported image type.')
-
-    ext = WORKOUT_IMAGE_TYPES[payload.contentType]
-    object_key = f"coaches/{short_id(coach_pk)}/workout-images/{uuid.uuid4().hex}{ext}"
-
-    try:
-        post = s3.generate_presigned_post(
-            Bucket=CLIENT_MEDIA_BUCKET,
-            Key=object_key,
-            Fields={'Content-Type': payload.contentType},
-            Conditions=[
-                {'Content-Type': payload.contentType},
-                ['content-length-range', 1, MAX_WORKOUT_IMAGE_BYTES],
-                ['starts-with', '$key', f'coaches/{short_id(coach_pk)}/workout-images/'],
-            ],
-            ExpiresIn=300,
-        )
-    except ClientError:
-        raise HTTPException(status_code=503, detail='Unable to prepare image upload.')
-
-    return {
-        'uploadUrl': post['url'],
-        'fields': post['fields'],
-        'objectKey': object_key,
-        'expiresIn': 300,
-    }
-
-
-@app.post("/coach/{coachId}/templates/import/generate")
-def workout_image_generate(
-    coachId: str,
-    request_body: Dict[str, Any],
-    user: dict = Depends(require_roles('COACH', 'ADMIN')),
-):
-    """Step 2 – read the uploaded image from S3 and call Claude to extract workout data."""
-    import urllib.request as _urllib_request
-
-    coach_pk = make_pk('COACH', coachId)
-    authorize_coach_scope(user, coach_pk)
-
-    object_key = request_body.get('objectKey', '')
-    if not object_key or not object_key.startswith(f'coaches/{short_id(coach_pk)}/workout-images/'):
-        raise HTTPException(status_code=403, detail='Invalid image reference.')
-
-    if not CLIENT_MEDIA_BUCKET:
-        raise HTTPException(status_code=503, detail='Image storage is not configured.')
-
-    # Fetch the image bytes from S3
-    try:
-        s3_obj = s3.get_object(Bucket=CLIENT_MEDIA_BUCKET, Key=object_key)
-        image_bytes = s3_obj['Body'].read()
-        content_type = s3_obj.get('ContentType', 'image/jpeg')
-    except ClientError:
-        raise HTTPException(status_code=404, detail='Uploaded image not found. Please upload again.')
-
-    if len(image_bytes) > MAX_WORKOUT_IMAGE_BYTES:
-        raise HTTPException(status_code=400, detail='Image too large.')
-
-    image_b64 = base64.b64encode(image_bytes).decode('utf-8')
-
-    # Call Anthropic Claude API to extract workout data
-    anthropic_api_key = os.environ.get('ANTHROPIC_API_KEY')
-    if not anthropic_api_key:
-        raise HTTPException(status_code=503, detail='AI service is not configured.')
-
-    prompt = (
-        "You are a professional fitness data extractor. Analyse this workout image and return ONLY valid JSON "
-        "with no markdown, no explanation, no code fences. Extract every detail you can see.\n\n"
-        "Return this exact JSON structure (use empty string or null for missing fields):\n"
-        "{\n"
-        '  "title": "",\n'
-        '  "description": "",\n'
-        '  "goal": "",\n'
-        '  "level": "",\n'
-        '  "workoutDays": "",\n'
-        '  "estimatedDuration": "",\n'
-        '  "equipment": "",\n'
-        '  "exercises": [\n'
-        '    {\n'
-        '      "order": 1,\n'
-        '      "name": "",\n'
-        '      "sets": "",\n'
-        '      "reps": "",\n'
-        '      "rest": "",\n'
-        '      "tempo": "",\n'
-        '      "weight": "",\n'
-        '      "rpe": "",\n'
-        '      "notes": ""\n'
-        '    }\n'
-        '  ]\n'
-        "}\n\n"
-        "Be precise. Preserve the exact exercise names, set/rep schemes, and any notes visible in the image."
-    )
-
-    request_payload = json.dumps({
-        "model": "claude-opus-4-5",
-        "max_tokens": 4096,
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": content_type,
-                            "data": image_b64,
-                        },
-                    },
-                    {"type": "text", "text": prompt},
-                ],
-            }
-        ],
-    }).encode('utf-8')
-
-    req = _urllib_request.Request(
-        'https://api.anthropic.com/v1/messages',
-        data=request_payload,
-        headers={
-            'Content-Type': 'application/json',
-            'x-api-key': anthropic_api_key,
-            'anthropic-version': '2023-06-01',
-        },
-        method='POST',
-    )
-
-    try:
-        with _urllib_request.urlopen(req, timeout=60) as resp:
-            response_data = json.loads(resp.read().decode('utf-8'))
-    except Exception as exc:
-        logger.error("Anthropic API error: %s", exc)
-        raise HTTPException(status_code=502, detail='AI extraction service unavailable. Please try again.')
-
-    raw_text = ''
-    for block in response_data.get('content', []):
-        if block.get('type') == 'text':
-            raw_text += block['text']
-
-    # Strip any accidental markdown fences
-    cleaned = raw_text.strip()
-    if cleaned.startswith('```'):
-        cleaned = '\n'.join(cleaned.split('\n')[1:])
-    if cleaned.endswith('```'):
-        cleaned = '\n'.join(cleaned.split('\n')[:-1])
-    cleaned = cleaned.strip()
-
-    try:
-        extracted = json.loads(cleaned)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=502, detail='AI returned unparseable data. Please try a clearer image.')
-
-    return {
-        'objectKey': object_key,
-        'extracted': extracted,
-    }
-
-
-@app.post("/coach/{coachId}/templates/import/approve")
-def workout_image_approve(
-    coachId: str,
-    request_body: Dict[str, Any],
-    user: dict = Depends(require_roles('COACH', 'ADMIN')),
-):
-    """Step 3 – save the approved (possibly edited) template to the database."""
-    coach_pk = make_pk('COACH', coachId)
-    authorize_coach_scope(user, coach_pk)
-
-    data = request_body.get('template', {})
-    object_key = request_body.get('objectKey', '')
-
-    exercises = clean_exercises(data.get('exercises')) or []
-    now = now_iso()
-    item = to_dynamo({
-        'PK': coach_pk,
-        'SK': f'TEMPLATE#tpl_{uuid.uuid4().hex[:8]}',
-        'type': 'TEMPLATE',
-        'title': clean_text(data.get('title'), 100) or 'Imported Template',
-        'description': clean_text(data.get('description'), 500) or '',
-        'goal': clean_text(data.get('goal'), 50) or 'General Fitness',
-        'workoutDays': clean_text(data.get('workoutDays'), 50) or '',
-        'activities': clean_text(data.get('activities'), 50) or f'{len(exercises)} Exercises',
-        'exercises': exercises,
-        'level': clean_text(data.get('level'), 50) or '',
-        'estimatedDuration': clean_text(data.get('estimatedDuration'), 50) or '',
-        'equipment': clean_text(data.get('equipment'), 200) or '',
-        'referenceImageKey': clean_text(object_key, 500) if object_key else '',
-        'createdAt': now,
-        'updatedAt': now,
-    })
-    table.put_item(Item=item)
-    return {'message': 'Template saved', 'template': template_out(item)}
 
 
 # ---------------------------------------------------------------------------
@@ -2169,58 +1972,25 @@ def get_media_view_url(
     objectKey: str,
     user: dict = Depends(require_roles('CLIENT', 'COACH', 'ADMIN')),
 ):
-    """Return a short-lived presigned GET URL for a media object the caller is authorised to see.
-
-    Security model:
-      CLIENT  → may only view their own files under clients/{their-id}/
-      COACH   → may view their own coach files AND files belonging to their assigned clients
-      ADMIN   → may view any client or coach file
-    Path traversal: keys containing '..' or starting with '/' are rejected before prefix check.
-    """
+    """Return a presigned view URL for a media object the caller is authorised to see."""
     if not CLIENT_MEDIA_BUCKET:
         raise HTTPException(status_code=503, detail='Media storage is not configured.')
 
-    # Decode once; a second unquote() is intentionally not applied.
-    decoded_key = unquote(objectKey)
-
-    # Reject path-traversal attempts and absolute paths before any prefix check.
-    if '..' in decoded_key or decoded_key.startswith('/'):
-        raise HTTPException(status_code=400, detail='Invalid object key.')
-
+    # Authorisation: the object key must be scoped to the caller's own ID
     pk = user['pk']
     caller_short = short_id(pk)
     role = user.get('role', '')
 
-    allowed = False
-
-    if role == 'ADMIN':
-        # Admins may view any media stored under the two top-level namespaces.
-        allowed = decoded_key.startswith('clients/') or decoded_key.startswith('coaches/')
-
-    elif role == 'CLIENT':
-        # Clients see only their own files.
-        allowed = decoded_key.startswith(f'clients/{caller_short}/')
-
+    allowed_prefixes = []
+    if role == 'CLIENT':
+        allowed_prefixes = [f'clients/{caller_short}/']
     elif role == 'COACH':
-        # Coaches see their own files unconditionally.
-        if decoded_key.startswith(f'coaches/{caller_short}/'):
-            allowed = True
-        # Coaches may also view their assigned clients' media files.
-        # Extract the client short-ID from the key and verify the relationship.
-        elif decoded_key.startswith('clients/'):
-            parts = decoded_key.split('/')          # ['clients', '<client-short-id>', ...]
-            if len(parts) >= 3:
-                key_client_short = parts[1]
-                client_pk = f'CLIENT#{key_client_short}'
-                client_profile = get_profile(client_pk)
-                if (
-                    client_profile
-                    and client_profile.get('role') == 'CLIENT'
-                    and client_profile.get('coachId') in (pk, caller_short)
-                ):
-                    allowed = True
+        allowed_prefixes = [f'coaches/{caller_short}/']
+    elif role == 'ADMIN':
+        allowed_prefixes = ['clients/', 'coaches/']  # admins can view any media
 
-    if not allowed:
+    decoded_key = unquote(objectKey)
+    if not any(decoded_key.startswith(p) for p in allowed_prefixes):
         raise HTTPException(status_code=403, detail='Access denied to this media object.')
 
     try:

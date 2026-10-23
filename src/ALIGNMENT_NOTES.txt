@@ -1,0 +1,18 @@
+Blue Fit Frontend - aligned/no-AI revision
+
+Source of truth used:
+- Existing frontend structure from srcorg(1).zip
+- Prior alignment/build/QA decisions in the conversation
+- AI image feature explicitly excluded per request
+
+Changes applied:
+1. WorkoutImageImport remains in the existing path/name for structure compatibility, but is now JSON-only.
+2. JSON importer accepts one template object or a one-item array and rejects multi-template files with a clear message.
+3. JSON import saves through the existing createTemplate API, keeping import logic aligned with manual template creation.
+4. Exercise rows preserve section/type/order/rest/tempo/weight/RPE/notes in the review UI.
+5. AI image upload/generate/approve API calls were removed from the frontend.
+6. AI/reference-image button was removed from the coach template list; generic MediaViewerModal remains for existing non-template media features.
+7. Missing client health-overview CSS classes were added.
+8. Existing HealthSyncCard in-flight guard/time-range behavior was preserved.
+
+No unrelated app structure was changed.

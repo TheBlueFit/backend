@@ -108,7 +108,7 @@
 //             <p className="label-text" style={{ textTransform: 'none', color: 'var(--text-secondary)', letterSpacing: '0', fontSize: '14px', margin: 0 }}>Global system oversight, user access management, and core services.</p>
 //           </div>
 //           <button 
-//             onClick={() => window.location.reload()} 
+//             onClick={fetchUsers} 
 //             className="btn-primary" 
 //             style={{ padding: '10px 20px', flex: 'none', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(229, 184, 105, 0.15)', color: 'var(--accent-gold)', border: '1px solid rgba(229, 184, 105, 0.4)', cursor: 'pointer' }}
 //           >
@@ -313,24 +313,24 @@ export default function AdminDashboard() {
   }, []);
 
   // Fetch live users from DynamoDB on mount
+  // Fix 8: fetchUsers hoisted so Sync Database button can call it directly
+  const fetchUsers = async () => {
+    try {
+      setIsLoading(true);
+      setFetchError(null);
+      const data = await dashboardAPI.getAllUsers();
+      setDbUsers(data);
+    } catch (error: any) {
+      console.error("Fetch failed:", error);
+      setFetchError(error.message || "Failed to load users.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setIsLoading(true);
-        setFetchError(null);
-        
-        const data = await dashboardAPI.getAllUsers();
-        setDbUsers(data);
-      } catch (error: any) {
-        console.error("Fetch failed:", error);
-        setFetchError(error.message || "Failed to load users.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
     fetchUsers();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDeleteUser = async (userId: string) => {
     if (!confirm("Are you sure you want to delete this user?")) return;
@@ -430,7 +430,7 @@ export default function AdminDashboard() {
               <p className="label-text" style={{ textTransform: 'none', color: 'var(--text-secondary)', letterSpacing: '0', fontSize: '14px', margin: 0 }}>Global system oversight, user access management, and core services.</p>
             </div>
             <button 
-              onClick={() => window.location.reload()} 
+              onClick={fetchUsers} 
               className="btn-primary" 
               style={{ padding: '10px 20px', flex: 'none', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(229, 184, 105, 0.15)', color: 'var(--accent-gold)', border: '1px solid rgba(229, 184, 105, 0.4)', cursor: 'pointer' }}
             >

@@ -3045,3 +3045,364 @@ body {
 @keyframes bluefitSpin {
   to { transform: rotate(360deg); }
 }
+
+
+/* =========================================================
+   BLUE FIT — CLIENT HEALTH OVERVIEW / RING CAPTION
+   Final visual rules for the client health overview.
+   ========================================================= */
+.bf-overview-copy {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.bf-overview-copy h3 {
+  margin: 8px 0 0;
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.bf-overview-copy > p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+  max-width: 380px;
+}
+
+.bf-overview-rings {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.bf-ring-caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding: 0 2px;
+}
+
+.bf-ring-caption > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.38);
+  white-space: nowrap;
+}
+
+.bf-ring-caption > span:nth-child(1)::before,
+.bf-ring-caption > span:nth-child(2)::before,
+.bf-ring-caption > span:nth-child(3)::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.bf-ring-caption > span:nth-child(1)::before {
+  background: #68C7A1;
+  box-shadow: 0 0 6px #68C7A144;
+}
+
+.bf-ring-caption > span:nth-child(2)::before {
+  background: #8E82C7;
+  box-shadow: 0 0 6px #8E82C744;
+}
+
+.bf-ring-caption > span:nth-child(3)::before {
+  background: #C19A5A;
+  box-shadow: 0 0 6px #C19A5A44;
+}
+
+@media (max-width: 760px) {
+  .bf-overview-rings {
+    order: -1;
+    align-items: flex-start;
+    flex-direction: row;
+    gap: 14px;
+  }
+
+  .bf-ring-caption {
+    justify-content: flex-start;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 430px) {
+  .bf-overview-rings {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+
+/* =========================================================
+   BLUE FIT — SIGNATURE METRICS
+   Replace generic concentric progress rings with expressive
+   metric-shaped progress visuals.
+   ========================================================= */
+.bf-signature-overview {
+  position: relative;
+  overflow: hidden;
+  padding: 24px;
+  border-radius: 26px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: linear-gradient(145deg, rgba(4,5,6,0.985), rgba(0,0,0,0.99));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.018), 0 20px 46px rgba(0,0,0,0.2);
+}
+
+.bf-signature-backdrop {
+  position: absolute;
+  width: 480px;
+  height: 260px;
+  right: -170px;
+  top: -110px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(104,199,161,0.07), rgba(142,130,199,0.025) 42%, transparent 72%);
+  filter: blur(28px);
+  pointer-events: none;
+}
+
+.bf-signature-heading {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 22px;
+  margin-bottom: 22px;
+}
+
+.bf-signature-heading h3 {
+  margin: 8px 0 0;
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.bf-signature-heading p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.65;
+  max-width: 520px;
+}
+
+.bf-signature-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.bf-signature-metric {
+  --signature-accent: #68C7A1;
+  min-height: 190px;
+  padding: 17px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(160deg, rgba(255,255,255,0.028), rgba(255,255,255,0.012));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.018);
+}
+
+.bf-signature-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.bf-signature-eyebrow {
+  font-size: 9px;
+  line-height: 1.2;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.bf-signature-value {
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+
+.bf-signature-value small {
+  margin-left: 3px;
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.bf-signature-visual {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin-top: 13px;
+}
+
+.bf-signature-art {
+  position: relative;
+  width: 82px;
+  min-height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bf-signature-glow {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--signature-accent);
+  opacity: 0.045;
+  filter: blur(18px);
+  pointer-events: none;
+}
+
+.bf-signature-copy {
+  min-width: 0;
+}
+
+.bf-signature-copy > span {
+  display: block;
+  min-height: 30px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.bf-signature-progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.bf-signature-track {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.055);
+}
+
+.bf-signature-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--signature-accent) 35%, transparent), var(--signature-accent));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--signature-accent) 45%, transparent);
+  transition: width 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.bf-signature-progress strong {
+  font-size: 9px;
+  color: var(--signature-accent);
+  font-weight: 700;
+}
+
+.bf-pulse-score {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.bf-pulse-score-orbit,
+.bf-pulse-score-orbit::after {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  content: "";
+}
+
+.bf-pulse-score-orbit {
+  border: 1px solid rgba(255,255,255,0.09);
+  background: conic-gradient(from -35deg, rgba(104,199,161,0.55), rgba(142,130,199,0.35), rgba(193,154,90,0.4), rgba(104,199,161,0.55));
+  -webkit-mask: radial-gradient(circle, transparent 61%, #000 62%);
+  mask: radial-gradient(circle, transparent 61%, #000 62%);
+  filter: drop-shadow(0 0 8px rgba(104,199,161,0.08));
+}
+
+.bf-pulse-score-orbit::after {
+  inset: 10px;
+  border: 1px dashed rgba(255,255,255,0.06);
+}
+
+.bf-pulse-score-inner {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.045), rgba(0,0,0,0.35) 72%);
+  border: 1px solid rgba(255,255,255,0.045);
+}
+
+.bf-pulse-score-value {
+  color: var(--text-primary);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+}
+
+.bf-pulse-score-unit {
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+}
+
+.bf-pulse-score-label {
+  margin-top: 5px;
+  color: var(--text-secondary);
+  font-size: 8px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 980px) {
+  .bf-signature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 680px) {
+  .bf-signature-heading { grid-template-columns: 1fr; }
+  .bf-pulse-score { width: 86px; height: 86px; }
+  .bf-pulse-score-inner { width: 62px; height: 62px; }
+  .bf-signature-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 430px) {
+  .bf-signature-overview { padding: 18px; }
+  .bf-signature-grid { grid-template-columns: 1fr; }
+  .bf-signature-metric { min-height: 175px; }
+}

@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 import MetricCard from "@/components/shared/MetricCard";
-import ProgressRing from "@/components/shared/ProgressRing";
+import ShapeFiller from "@/components/shared/ShapeFiller";
 
 interface ClientTrackerDashboardProps {
   steps?: number | null;
@@ -31,255 +31,120 @@ interface ClientTrackerDashboardProps {
   recovery?: number | null;
 
   calories?: number | null;
+  heartRate?: number | null;
   workoutsThisWeek?: number | null;
 }
 
 const clamp = (value: number) =>
   Math.min(100, Math.max(0, Number(value) || 0));
 
-function ConcentricRings({
-  steps,
-  sleep,
-  activity,
+function OverallPulse({
+  value,
+  hasData,
 }: {
-  steps?: number | null;
-  sleep?: number | null;
-  activity?: number | null;
+  value?: number | null;
+  hasData: boolean;
 }) {
-  const rawValues: Array<number | null> = [
-    steps ?? null,
-    sleep ?? null,
-    activity ?? null,
-  ];
-
-  const colors = ["#68C7A1", "#8E82C7", "#C19A5A"];
-
-  const rings = [
-    { radius: 82, width: 9 },
-    { radius: 65, width: 8 },
-    { radius: 48, width: 8 },
-  ];
-
-  const [animated, setAnimated] = useState([0, 0, 0]);
+  const safe = value == null ? 0 : clamp(value);
+  const [animated, setAnimated] = useState(0);
 
   useEffect(() => {
+    if (!hasData) {
+      setAnimated(0);
+      return;
+    }
+
     let frame = 0;
-
     const start = performance.now();
-    const duration = 950;
+    const duration = 900;
 
-    setAnimated([0, 0, 0]);
-
-    const animate = (time: number) => {
-      const ratio = Math.min(
-        (time - start) / duration,
-        1
-      );
-
+    const tick = (time: number) => {
+      const ratio = Math.min((time - start) / duration, 1);
       const eased = 1 - Math.pow(1 - ratio, 3);
-
-      setAnimated(
-        rawValues.map((value) =>
-          value == null
-            ? 0
-            : clamp(value) * eased
-        )
-      );
-
-      if (ratio < 1) {
-        frame = requestAnimationFrame(animate);
-      }
+      setAnimated(safe * eased);
+      if (ratio < 1) frame = requestAnimationFrame(tick);
     };
 
-    frame = requestAnimationFrame(animate);
-
+    frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [steps, sleep, activity]);
-
-  const hasAnyData = rawValues.some(
-    (value) => value != null
-  );
-
-  const size = 205;
-  const center = size / 2;
+  }, [safe, hasData]);
 
   return (
     <div
-      style={{
-        width: size,
-        height: size,
-        position: "relative",
-        flexShrink: 0,
-      }}
-      aria-label="Daily movement, sleep and training progress"
+      className="bf-pulse-score"
+      aria-label={`Daily pulse score: ${hasData ? `${Math.round(safe)} percent` : "no data"}`}
     >
-      <svg
-        width={size}
-        height={size}
-        viewBox={`0 0 ${size} ${size}`}
-        style={{
-          overflow: "visible",
-          transform: "rotate(-90deg)",
-        }}
-        aria-hidden="true"
-      >
-        {rings.map((ring, index) => {
-          const circumference =
-            2 * Math.PI * ring.radius;
-
-          const dashOffset =
-            circumference -
-            (animated[index] / 100) *
-              circumference;
-
-          const hasValue =
-            rawValues[index] != null;
-
-          return (
-            <g key={ring.radius}>
-              <circle
-                cx={center}
-                cy={center}
-                r={ring.radius}
-                fill="none"
-                stroke="rgba(255,255,255,0.045)"
-                strokeWidth={ring.width}
-              />
-
-              {hasValue && (
-                <circle
-                  cx={center}
-                  cy={center}
-                  r={ring.radius}
-                  fill="none"
-                  stroke={colors[index]}
-                  strokeWidth={ring.width}
-                  strokeLinecap="round"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={dashOffset}
-                  style={{
-                    transition:
-                      "stroke-dashoffset 70ms linear",
-                    filter: `drop-shadow(0 0 4px ${colors[index]}2b)`,
-                  }}
-                />
-              )}
-            </g>
-          );
-        })}
-      </svg>
-
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexDirection: "column",
-          textAlign: "center",
-        }}
-      >
-        <div
-          style={{
-            fontSize: "31px",
-            fontWeight: 700,
-            lineHeight: 1,
-            letterSpacing: "-0.05em",
-            color: "var(--text-primary)",
-          }}
-        >
-          {hasAnyData
-            ? `${Math.round(animated[2])}%`
-            : "—"}
-        </div>
-
-        <div
-          style={{
-            marginTop: "6px",
-            fontSize: "9px",
-            letterSpacing: "0.16em",
-            textTransform: "uppercase",
-            color: "var(--text-secondary)",
-          }}
-        >
-          {hasAnyData
-            ? "Daily pulse"
-            : "No activity yet"}
-        </div>
+      <div className="bf-pulse-score-orbit" aria-hidden="true" />
+      <div className="bf-pulse-score-inner">
+        <span className="bf-pulse-score-value">
+          {hasData ? Math.round(animated) : "—"}
+        </span>
+        <span className="bf-pulse-score-unit">/ 100</span>
+        <span className="bf-pulse-score-label">Daily pulse</span>
       </div>
     </div>
   );
 }
 
-function PulseLegend({
-  color,
-  title,
+function SignatureMetric({
+  shape,
+  accent,
+  eyebrow,
   value,
+  unit,
   detail,
+  progress,
 }: {
-  color: string;
-  title: string;
+  shape: "footsteps" | "droplet" | "heart" | "moon" | "barbell";
+  accent: string;
+  eyebrow: string;
   value: string;
+  unit?: string;
   detail: string;
+  progress?: number | null;
 }) {
+  const hasProgress = progress != null && Number.isFinite(Number(progress));
+  const safeProgress = hasProgress ? clamp(Number(progress)) : 0;
+
   return (
     <div
-      style={{
-        display: "grid",
-        gridTemplateColumns:
-          "10px minmax(0,1fr) auto",
-        alignItems: "center",
-        gap: "10px",
-      }}
+      className="bf-signature-metric"
+      style={{ ["--signature-accent" as string]: accent } as React.CSSProperties}
     >
-      <span
-        style={{
-          width: "7px",
-          height: "7px",
-          borderRadius: "999px",
-          background: color,
-          opacity:
-            value === "—" ? 0.25 : 1,
-          boxShadow: `0 0 7px ${color}44`,
-        }}
-      />
-
-      <div>
-        <div
-          style={{
-            fontSize: "10px",
-            textTransform: "uppercase",
-            letterSpacing: "0.09em",
-            color: "var(--text-secondary)",
-          }}
-        >
-          {title}
-        </div>
-
-        <div
-          style={{
-            marginTop: "3px",
-            fontSize: "11px",
-            color: "rgba(255,255,255,0.46)",
-          }}
-        >
-          {detail}
-        </div>
+      <div className="bf-signature-top">
+        <span className="bf-signature-eyebrow">{eyebrow}</span>
+        <span className="bf-signature-value">
+          {value}
+          {unit && <small>{unit}</small>}
+        </span>
       </div>
 
-      <strong
-        style={{
-          fontSize: "13px",
-          fontWeight: 600,
-          color:
-            value === "—"
-              ? "var(--text-secondary)"
-              : "rgba(255,255,255,0.82)",
-        }}
-      >
-        {value}
-      </strong>
+      <div className="bf-signature-visual">
+        <div className="bf-signature-art">
+          <div className="bf-signature-glow" aria-hidden="true" />
+          <ShapeFiller
+            shape={shape}
+            progress={hasProgress ? safeProgress : undefined}
+            accent={accent}
+            size={shape === "barbell" ? 82 : 72}
+            noData={!hasProgress}
+          />
+        </div>
+        <div className="bf-signature-copy">
+          <span>{detail}</span>
+          <div className="bf-signature-progress">
+            <div className="bf-signature-track">
+              {hasProgress && (
+                <div
+                  className="bf-signature-fill"
+                  style={{ width: `${safeProgress}%` }}
+                />
+              )}
+            </div>
+            <strong>{hasProgress ? `${Math.round(safeProgress)}%` : "—"}</strong>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -294,6 +159,7 @@ export default function ClientTrackerDashboard({
   workoutCompletion,
   recovery,
   calories,
+  heartRate,
   workoutsThisWeek,
 }: ClientTrackerDashboardProps) {
   const stepProgress =
@@ -345,6 +211,20 @@ export default function ClientTrackerDashboard({
 
   const hasWeeklyData =
     workoutsThisWeek != null;
+
+  const pulseInputs = [
+    stepProgress,
+    sleepProgress,
+    workoutCompletion,
+    recovery,
+  ].filter(
+    (v): v is number =>
+      v != null && Number.isFinite(Number(v))
+  );
+
+  const dailyPulse = pulseInputs.length
+    ? pulseInputs.reduce((sum, value) => sum + value, 0) / pulseInputs.length
+    : undefined;
 
   useEffect(() => {
     let frame = 0;
@@ -427,97 +307,83 @@ export default function ClientTrackerDashboard({
         gap: "18px",
       }}
     >
-      {/* Primary health overview */}
-      <section className="bf-premium-overview">
-        <div
-          className="bf-overview-glow"
-          aria-hidden="true"
-        />
+      {/* Signature health overview */}
+      <section className="bf-signature-overview">
+        <div className="bf-signature-backdrop" aria-hidden="true" />
 
-        <div className="bf-overview-copy">
-          <div className="bf-kicker">
-            HEALTH OVERVIEW
+        <div className="bf-signature-heading">
+          <div>
+            <div className="bf-kicker">HEALTH OVERVIEW</div>
+            <h3>Today's rhythm</h3>
+            <p>
+              {hasAnyData
+                ? "A calmer view of the signals that matter today — each metric has its own visual language."
+                : "Your personal activity will appear here as you move, sleep, train and recover."}
+            </p>
           </div>
-
-          <h3>Today's rhythm</h3>
-
-          <p>
-            {hasAnyData
-              ? "Movement, recovery and training — brought together into one quiet daily signal."
-              : "Your personal activity will appear here as you train, move, recover and check in."}
-          </p>
-
-          <div className="bf-pulse-legend">
-            <PulseLegend
-              color="#68C7A1"
-              title="Movement"
-              value={
-                steps != null
-                  ? steps.toLocaleString()
-                  : "—"
-              }
-              detail={
-                stepProgress != null &&
-                stepGoal != null
-                  ? `${Math.round(
-                      stepProgress
-                    )}% of step goal`
-                  : "No activity data yet"
-              }
-            />
-
-            <PulseLegend
-              color="#8E82C7"
-              title="Sleep"
-              value={
-                sleepHours != null
-                  ? `${sleepHours.toFixed(
-                      1
-                    )}h`
-                  : "—"
-              }
-              detail={
-                sleepProgress != null
-                  ? `${Math.round(
-                      sleepProgress
-                    )}% of target`
-                  : "No sleep data yet"
-              }
-            />
-
-            <PulseLegend
-              color="#C19A5A"
-              title="Training"
-              value={
-                workoutCompletion != null
-                  ? `${Math.round(
-                      workoutCompletion
-                    )}%`
-                  : "—"
-              }
-              detail={
-                workoutCompletion != null
-                  ? "weekly completion"
-                  : "No workout data yet"
-              }
-            />
-          </div>
+          <OverallPulse
+            value={dailyPulse}
+            hasData={dailyPulse != null}
+          />
         </div>
 
-        <div className="bf-overview-rings">
-          <ConcentricRings
-            steps={stepProgress}
-            sleep={sleepProgress}
-            activity={
-              workoutCompletion
+        <div className="bf-signature-grid">
+          <SignatureMetric
+            shape="footsteps"
+            accent="#68C7A1"
+            eyebrow="Movement"
+            value={steps != null ? steps.toLocaleString() : "—"}
+            detail={
+              stepProgress != null && stepGoal != null
+                ? `${Math.round(stepProgress)}% of ${stepGoal.toLocaleString()} steps`
+                : "Waiting for movement data"
             }
+            progress={stepProgress}
           />
 
-          <div className="bf-ring-caption">
-            <span>Movement</span>
-            <span>Sleep</span>
-            <span>Training</span>
-          </div>
+          <SignatureMetric
+            shape="heart"
+            accent="#C97878"
+            eyebrow="Heart rate"
+            value={heartRate != null ? `${Math.round(heartRate)}` : "—"}
+            unit={heartRate != null ? " bpm" : undefined}
+            detail={
+              recovery != null
+                ? `Readiness signal ${Math.round(recovery)}%`
+                : heartRate != null
+                ? "Heart signal available"
+                : "Waiting for heart-rate data"
+            }
+            progress={recovery}
+          />
+
+          <SignatureMetric
+            shape="moon"
+            accent="#8E82C7"
+            eyebrow="Sleep"
+            value={sleepHours != null ? sleepHours.toFixed(1) : "—"}
+            unit={sleepHours != null ? " h" : undefined}
+            detail={
+              sleepProgress != null && sleepGoal != null
+                ? `${Math.round(sleepProgress)}% of ${sleepGoal}h target`
+                : "Waiting for sleep data"
+            }
+            progress={sleepProgress}
+          />
+
+          <SignatureMetric
+            shape="barbell"
+            accent="#C19A5A"
+            eyebrow="Workout"
+            value={workoutCompletion != null ? `${Math.round(workoutCompletion)}` : "—"}
+            unit={workoutCompletion != null ? "%" : undefined}
+            detail={
+              workoutsThisWeek != null
+                ? `${workoutsThisWeek} sessions this week`
+                : "Waiting for workout data"
+            }
+            progress={workoutCompletion}
+          />
         </div>
       </section>
 
@@ -547,18 +413,36 @@ export default function ClientTrackerDashboard({
           </p>
         </div>
 
-        <ProgressRing
-          value={
-            recovery != null
-              ? recovery
-              : undefined
-          }
-          size={90}
-          strokeWidth={6}
-          label="Recovery"
-          accent="#63B99B"
-          glow={1}
-        />
+        <div
+          style={{
+            width: "92px",
+            minHeight: "92px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "5px",
+            flexShrink: 0,
+          }}
+        >
+          <ShapeFiller
+            shape="heart"
+            progress={recovery ?? undefined}
+            accent="#63B99B"
+            size={64}
+            noData={recovery == null}
+          />
+          <span
+            style={{
+              fontSize: "9px",
+              color: "var(--text-secondary)",
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+            }}
+          >
+            {recovery != null ? `${Math.round(recovery)}%` : "No data"}
+          </span>
+        </div>
       </section>
 
       {/* Core metrics */}
@@ -578,6 +462,7 @@ export default function ClientTrackerDashboard({
           progress={stepProgress}
           progressLabel="Movement"
           accent="#68C7A1"
+          fillerShape="footsteps"
           icon={
             <Footprints size={18} />
           }
@@ -603,6 +488,7 @@ export default function ClientTrackerDashboard({
           progress={sleepProgress}
           progressLabel="Sleep"
           accent="#8E82C7"
+          fillerShape="moon"
           icon={<Moon size={18} />}
         />
 
@@ -628,6 +514,7 @@ export default function ClientTrackerDashboard({
           }
           progressLabel="Hydration"
           accent="#5BAFC0"
+          fillerShape="droplet"
           icon={
             <Droplets size={18} />
           }
@@ -657,6 +544,7 @@ export default function ClientTrackerDashboard({
           }
           progressLabel="Completion"
           accent="#C19A5A"
+          fillerShape="barbell"
           icon={
             <Dumbbell size={18} />
           }
@@ -709,6 +597,7 @@ export default function ClientTrackerDashboard({
           }
           progressLabel="Readiness"
           accent="#63B99B"
+          fillerShape="heart"
           icon={
             <HeartPulse size={18} />
           }
@@ -759,6 +648,7 @@ export default function ClientTrackerDashboard({
           progress={stepProgress}
           progressLabel="Goal"
           accent="#6DBBC3"
+          fillerShape="droplet"
           icon={
             <Activity size={18} />
           }

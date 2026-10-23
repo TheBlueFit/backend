@@ -1,8 +1,33 @@
 "use client";
+/**
+ * Schedule View — loaded inside an iframe from ClientScheduleViewer.
+ * Fix 4: This page reads the session token directly from localStorage
+ * (via authSession) and makes its own authenticated API call, bypassing
+ * the client layout auth-guard that would redirect the iframe to login.
+ */
 
 import React, { useEffect, useState } from "react";
 import { AlertCircle, Dumbbell, Loader2 } from "lucide-react";
-import { dashboardAPI } from "@/services/api";
+import { dashboardAPI, authSession } from "@/services/api";
+
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+
+async function fetchScheduleDirect(assignmentId: string): Promise<any> {
+  // Fix 4: Read session directly from localStorage so this works inside an iframe
+  // even if the parent layout's auth guard has not run in this browsing context.
+  const session = authSession.get();
+  if (!session?.token) throw new Error("Please sign in to view this schedule.");
+  const res = await fetch(
+    `${API_BASE_URL}/athlete/${encodeURIComponent(session.PK)}/schedules/${encodeURIComponent(assignmentId)}`,
+    { headers: { Authorization: `Bearer ${session.token}`, "Content-Type": "application/json" } }
+  );
+  if (!res.ok) {
+    let msg = `Request failed (${res.status})`;
+    try { const j = await res.json(); if (j.detail) msg = j.detail; } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
 
 function humanDate(value: string) {
   if (!value) return "";
@@ -12,21 +37,16 @@ function humanDate(value: string) {
 }
 
 export default function ClientScheduleViewPage() {
-  const [assignmentId, setAssignmentId] = useState("");
   const [schedule, setSchedule] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setAssignmentId(params.get("assignmentId") || "");
-  }, []);
+    const assignmentId = (params.get("assignmentId") || "").trim();
 
-  useEffect(() => {
     if (!assignmentId) {
-      if (typeof window !== "undefined" && window.location.search) {
-        setError("No schedule was selected.");
-      }
+      setError("No schedule was selected.");
       setLoading(false);
       return;
     }
@@ -34,7 +54,7 @@ export default function ClientScheduleViewPage() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await dashboardAPI.getAthleteScheduleDetail(assignmentId);
+        const data = await fetchScheduleDirect(assignmentId);
         if (!cancelled) setSchedule(data);
       } catch (err: any) {
         if (!cancelled) setError(err.message || "Could not load this schedule.");
@@ -46,7 +66,7 @@ export default function ClientScheduleViewPage() {
     return () => {
       cancelled = true;
     };
-  }, [assignmentId]);
+  }, []);
 
   if (loading) {
     return (

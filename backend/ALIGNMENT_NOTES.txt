@@ -1,0 +1,16 @@
+Blue Fit Backend - aligned/no-AI revision
+
+Source of truth used:
+- Existing backend structure from backendorg(1).zip
+- Prior alignment/build/QA decisions in the conversation
+- AI image feature explicitly excluded per request
+
+Changes applied:
+1. Existing admin edit-user and reset-password routes are preserved.
+2. Existing template CRUD/assignment/scheduling routes are preserved.
+3. clean_exercises now preserves the full exercise structure used by the frontend, including order, section, type, rest, tempo, weight, RPE and notes.
+4. seed_templates.py now preserves the same exercise fields and accepts either one template object or an array.
+5. AI image upload/generate/approve routes were removed because the AI image feature was explicitly excluded.
+6. Legacy read-only template image-view compatibility remains so existing stored reference-image records are not needlessly broken.
+
+No unrelated backend architecture was changed.

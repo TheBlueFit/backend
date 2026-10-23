@@ -28,24 +28,96 @@ export type CoachClient = {
 
 const SESSION_KEY = 'bluefit_user_session';
 
+// ── Persistent session store ────────────────────────────────────────────────
+// On native (iOS/Android via Capacitor), we use @capacitor/preferences which
+// writes to NSUserDefaults / SharedPreferences — this survives app clears,
+// backgrounding, and memory pressure kills. localStorage alone gets wiped by
+// Capacitor's WebView cache-clear on some Android OEMs and every iOS "Offload".
+//
+// On web we fall back to localStorage with sessionStorage as a secondary copy.
+//
+// The API is intentionally synchronous for the `get()` path (reads from the
+// in-memory cache below) and async for the `set()` / `clear()` paths.
+// ────────────────────────────────────────────────────────────────────────────
+let _sessionCache: UserSession | null = null;
+let _nativePrefsReady = false;
+
+// Attempt to hydrate from Capacitor Preferences once on first import
+async function hydrateFromNative(): Promise<void> {
+  try {
+    const { Preferences } = await import('@capacitor/preferences');
+    const { value } = await Preferences.get({ key: SESSION_KEY });
+    if (value) {
+      const parsed: UserSession = JSON.parse(value);
+      _sessionCache = parsed;
+      // Also write to localStorage so synchronous reads work right away
+      localStorage.setItem(SESSION_KEY, value);
+    }
+    _nativePrefsReady = true;
+  } catch {
+    // Not a native environment or plugin not installed — that's fine
+    _nativePrefsReady = true;
+  }
+}
+
+if (typeof window !== 'undefined') {
+  // Pre-populate cache from localStorage immediately (fast synchronous path)
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (raw) _sessionCache = JSON.parse(raw);
+  } catch {}
+  // Then enrich from native storage (async, catches anything localStorage missed)
+  hydrateFromNative().then(() => {
+    window.dispatchEvent(new Event('bluefit:auth-change'));
+  }).catch(() => {});
+}
+
+async function writeToNative(json: string): Promise<void> {
+  try {
+    const { Preferences } = await import('@capacitor/preferences');
+    await Preferences.set({ key: SESSION_KEY, value: json });
+  } catch {}
+}
+
+async function removeFromNative(): Promise<void> {
+  try {
+    const { Preferences } = await import('@capacitor/preferences');
+    await Preferences.remove({ key: SESSION_KEY });
+  } catch {}
+}
+
 export const authSession = {
+  /** Synchronous read — returns cached value immediately. */
   get: (): UserSession | null => {
     if (typeof window === 'undefined') return null;
+    // Return in-memory cache first (always up-to-date after set/clear)
+    if (_sessionCache) return _sessionCache;
+    // Fallback: parse localStorage (covers first render before hydrateFromNative resolves)
     try {
       const raw = localStorage.getItem(SESSION_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
+      if (raw) { _sessionCache = JSON.parse(raw); return _sessionCache; }
+    } catch {}
+    return null;
   },
+
+  /** Write session to all stores: memory + localStorage + Capacitor Preferences */
   set: (session: UserSession) => {
     if (typeof window === 'undefined') return;
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    const json = JSON.stringify(session);
+    _sessionCache = session;
+    localStorage.setItem(SESSION_KEY, json);
+    try { sessionStorage.setItem(SESSION_KEY, json); } catch {}
+    writeToNative(json); // fire-and-forget: persists to NSUserDefaults/SharedPreferences
     window.dispatchEvent(new Event('bluefit:auth-change'));
   },
+
+  /** Clear session from all stores */
   clear: () => {
     if (typeof window === 'undefined') return;
+    _sessionCache = null;
     localStorage.removeItem(SESSION_KEY);
+    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+    removeFromNative(); // fire-and-forget
     window.dispatchEvent(new Event('bluefit:auth-change'));
   },
 };

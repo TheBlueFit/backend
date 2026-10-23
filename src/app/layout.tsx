@@ -1,7 +1,7 @@
 "use client";
 
 import "./globals.css";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -55,6 +55,20 @@ const PORTAL_LABEL: Record<"ADMIN" | "COACH" | "CLIENT", string> = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [session, setSession] = useState<UserSession | null>(null);
+  // Fix 4 (iframe): detect iframe context with a hydration-safe external-store snapshot.
+  // Server snapshot is always false; the client snapshot can safely inspect window.
+  const isInIframe = useSyncExternalStore(
+    () => () => {},
+    () => {
+      try {
+        return new URLSearchParams(window.location.search).get("iframe") === "1"
+          || window.self !== window.top;
+      } catch {
+        return true;
+      }
+    },
+    () => false,
+  );
   const pathname = usePathname();
   const router = useRouter();
   const menuOpenRef = useRef(false);
@@ -247,20 +261,58 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     };
   }, []);
 
+  // Register PWA service worker (enables "Add to Home Screen" on iOS Safari)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        // Silently ignore — SW is a progressive enhancement
+      });
+    }
+  }, []);
+
   const handleLogout = () => {
     authSession.clear();
     setIsMenuOpen(false);
     router.replace("/");
   };
 
+  // Fix: schedule viewer is always a bare render. This prevents the global
+  // navigation and permissions gate from ever covering the in-app schedule preview.
+  if (isInIframe || pathname === "/client/schedules/view") {
+    return (
+      <html lang="en" className="dark">
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+          <link rel="manifest" href="/manifest.json" />
+          <meta name="theme-color" content="#050505" />
+          <meta name="mobile-web-app-capable" content="yes" />
+          <meta name="apple-mobile-web-app-capable" content="yes" />
+          <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+          <meta name="apple-mobile-web-app-title" content="BlueFit" />
+          <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+          <link rel="apple-touch-startup-image" href="/icons/icon-512.png" />
+        </head>
+        <body style={{ margin: 0, background: "#050505" }}>
+          {children}
+        </body>
+      </html>
+    );
+  }
+
   if (pathname === "/") {
     return (
       <html lang="en" className="dark">
         <head>
-          <meta
-            name="viewport"
-            content="width=device-width, initial-scale=1, viewport-fit=cover"
-          />
+          <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+          <link rel="manifest" href="/manifest.json" />
+          <meta name="theme-color" content="#050505" />
+          <meta name="mobile-web-app-capable" content="yes" />
+          <meta name="apple-mobile-web-app-capable" content="yes" />
+          <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+          <meta name="apple-mobile-web-app-title" content="BlueFit" />
+          <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+          <link rel="apple-touch-startup-image" href="/icons/icon-512.png" />
         </head>
         <body>
           <main className="main-content" style={{ width: "100%" }}>

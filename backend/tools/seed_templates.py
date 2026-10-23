@@ -13,8 +13,11 @@ Usage
       [--region eu-west-1] \
       [--dry-run]
 
-JSON format (array of template objects)
-----------------------------------------
+JSON format
+-----------
+The script accepts either one template object or an array of template objects.
+For app-side import, one template object per JSON file is recommended.
+
 [
   {
     "title": "6-Week Hypertrophy Block",
@@ -95,12 +98,18 @@ def build_template_item(coach_pk: str, raw: Dict[str, Any]) -> Dict[str, Any]:
     exercises = []
     for ex in exercises_raw:
         exercises.append({
-            "id":    clean(ex.get("id") or uuid.uuid4().hex[:8], 100),
-            "name":  clean(ex.get("name"), 100),
-            "sets":  clean(ex.get("sets"), 100),
-            "reps":  clean(ex.get("reps"), 100),
-            "rpe":   clean(ex.get("rpe"), 100),
-            "notes": clean(ex.get("notes"), 500),
+            "id":      clean(ex.get("id") or uuid.uuid4().hex[:8], 100),
+            "order":   clean(ex.get("order") or len(exercises) + 1, 20),
+            "section": clean(ex.get("section"), 100),
+            "type":    clean(ex.get("type"), 100),
+            "name":    clean(ex.get("name"), 150),
+            "sets":    clean(ex.get("sets"), 100),
+            "reps":    clean(ex.get("reps"), 100),
+            "rest":    clean(ex.get("rest"), 100),
+            "tempo":   clean(ex.get("tempo"), 100),
+            "weight":  clean(ex.get("weight"), 100),
+            "rpe":     clean(ex.get("rpe"), 100),
+            "notes":   clean(ex.get("notes"), 500),
         })
 
     now = now_iso()
@@ -176,8 +185,10 @@ def main() -> None:
         print(f"❌  Invalid JSON in {args.file}: {exc}", file=sys.stderr)
         sys.exit(1)
 
+    if isinstance(data, dict):
+        data = [data]
     if not isinstance(data, list):
-        print("❌  JSON must be an array of template objects.", file=sys.stderr)
+        print("❌  JSON must be a template object or an array of template objects.", file=sys.stderr)
         sys.exit(1)
 
     if not data:
