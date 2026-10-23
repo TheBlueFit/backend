@@ -12,6 +12,7 @@ import {
   LogOut,
   Menu,
   MessageSquare,
+  Monitor,
   Settings,
   UserPlus,
   Users,
@@ -31,6 +32,7 @@ const NAVIGATION: Record<"ADMIN" | "COACH" | "CLIENT", NavItem[]> = {
   ADMIN: [
     { href: "/admin", label: "Dashboard", Icon: LayoutDashboard },
     { href: "/admin/onboarding", label: "Onboarding", Icon: UserPlus },
+    { href: "/admin/monitor", label: "Monitor", Icon: Monitor },
   ],
   COACH: [
     { href: "/coach", label: "Dashboard", Icon: LayoutDashboard },

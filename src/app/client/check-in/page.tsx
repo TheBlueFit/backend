@@ -62,16 +62,16 @@ export default function WeeklyCheckIn() {
     });
   };
 
-  const uploadProgressPhotos = async () => {
+  const uploadProgressPhotos = async (checkinId: string) => {
     if (photos.length === 0) return;
 
     for (const { angle, file } of photos) {
       setUploadProgress(`Uploading ${angle} photo…`);
 
       // Reuse the 3-day photo upload endpoint with day=0 to indicate weekly check-in photos
-      const upload = await dashboardAPI.createThreeDayPhotoUpload({
-        day: 0,
-        meal: `progress_${angle.toLowerCase()}`,
+      const upload = await dashboardAPI.createProgressPhotoUpload({
+        checkinId,
+        angle: angle.toLowerCase(),
         fileName: file.name,
         contentType: file.type,
       });
@@ -83,9 +83,9 @@ export default function WeeklyCheckIn() {
       const res = await fetch(upload.uploadUrl, { method: "POST", body: form });
       if (!res.ok) throw new Error(`Failed to upload ${angle} photo.`);
 
-      await dashboardAPI.completeThreeDayPhoto({
-        day: 0,
-        meal: `progress_${angle.toLowerCase()}`,
+      await dashboardAPI.completeProgressPhoto({
+        checkinId,
+        angle: angle.toLowerCase(),
         objectKey: upload.objectKey,
         originalFileName: file.name,
       });
@@ -103,7 +103,7 @@ export default function WeeklyCheckIn() {
     const notes = String(form.get("notes") || "").trim();
 
     try {
-      await dashboardAPI.saveCheckin({
+      const saved = await dashboardAPI.saveCheckin({
         weight: Number(form.get("weight")),
         adherence: String(form.get("adherence")),
         workoutQuality: String(form.get("workoutQuality")),
@@ -113,7 +113,14 @@ export default function WeeklyCheckIn() {
 
       // Upload progress photos after saving the check-in record
       if (photos.length > 0) {
-        await uploadProgressPhotos();
+        try {
+          await uploadProgressPhotos(saved.checkinId);
+        } catch (photoErr: any) {
+          // The check-in itself is already saved — don't make the athlete submit it twice.
+          setError(`Your check-in was saved, but a photo could not be uploaded (${photoErr?.message || "upload failed"}).`);
+          setSubmitted(true);
+          return;
+        }
       }
 
       setSubmitted(true);
@@ -145,8 +152,11 @@ export default function WeeklyCheckIn() {
           <h2 className="animated-gradient-text" style={{ fontSize: "28px", marginBottom: "12px", textTransform: "none" }}>Check-In Complete</h2>
           <p style={{ color: "var(--text-secondary)", marginBottom: "32px", fontSize: "15px" }}>
             Your coach has been notified and will review your progress shortly.
-            {photos.length > 0 && " Progress photos have been uploaded securely."}
+            {photos.length > 0 && !error && " Progress photos have been uploaded securely."}
           </p>
+          {error && (
+            <p style={{ color: "var(--accent-gold)", marginBottom: "24px", fontSize: "13px" }}>{error}</p>
+          )}
           <button onClick={() => router.push("/client")} className="btn-primary full-width">Back to Dashboard</button>
         </div>
       </div>

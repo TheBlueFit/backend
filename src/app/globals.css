@@ -3406,3 +3406,141 @@ body {
   .bf-signature-grid { grid-template-columns: 1fr; }
   .bf-signature-metric { min-height: 175px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ShapeFiller — animated metric illustrations (.bf-sf-*)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.bf-sf { overflow: visible; display: block; }
+.bf-sf-idle { opacity: 0.6; filter: saturate(0.7); }
+
+/* liquid waves */
+.bf-sf-wave-a { animation: bf-sf-wave 5.4s linear infinite; }
+.bf-sf-wave-b { animation: bf-sf-wave 3.6s linear infinite reverse; }
+@keyframes bf-sf-wave {
+  from { transform: translateX(0); }
+  to   { transform: translateX(calc(var(--bf-w, 40px) * -1)); }
+}
+
+/* droplet */
+.bf-sf-bob { animation: bf-sf-bob 3.4s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes bf-sf-bob {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  50%      { transform: translateY(-2px) scale(0.985, 1.02); }
+}
+.bf-sf-bubble { animation: bf-sf-rise 3.2s ease-in infinite; transform-box: fill-box; transform-origin: center; opacity: 0; }
+@keyframes bf-sf-rise {
+  0%   { transform: translateY(0) scale(0.5); opacity: 0; }
+  20%  { opacity: 0.85; }
+  100% { transform: translateY(-34px) scale(1); opacity: 0; }
+}
+.bf-sf-ripple { animation: bf-sf-ripple 3.4s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes bf-sf-ripple {
+  0%   { transform: scale(0.5); opacity: 0.7; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+/* heart */
+.bf-sf-beat { animation: bf-sf-beat 1.35s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes bf-sf-beat {
+  0%, 60%, 100% { transform: scale(1); }
+  12% { transform: scale(1.09); }
+  24% { transform: scale(1); }
+  36% { transform: scale(1.06); }
+}
+.bf-sf-ecg { animation: bf-sf-ecg 1.9s linear infinite; }
+@keyframes bf-sf-ecg { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
+.bf-sf-heart-ring { animation: bf-sf-heart-ring 1.35s ease-out infinite; transform-box: fill-box; transform-origin: center; opacity: 0; }
+@keyframes bf-sf-heart-ring {
+  0%   { transform: scale(1); opacity: 0.55; }
+  60%  { transform: scale(1.22); opacity: 0; }
+  100% { transform: scale(1.22); opacity: 0; }
+}
+
+/* moon */
+.bf-sf-rock { animation: bf-sf-rock 6s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 90%; }
+@keyframes bf-sf-rock { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+.bf-sf-twinkle { animation: bf-sf-twinkle 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes bf-sf-twinkle {
+  0%, 100% { transform: scale(0.55); opacity: 0.25; }
+  50%      { transform: scale(1.15); opacity: 1; }
+}
+.bf-sf-z { animation: bf-sf-z 3.6s ease-in-out infinite; opacity: 0; transform-box: fill-box; transform-origin: center; }
+@keyframes bf-sf-z {
+  0%   { transform: translate(0, 0) scale(0.6); opacity: 0; }
+  25%  { opacity: 1; }
+  100% { transform: translate(6px, -14px) scale(1.15); opacity: 0; }
+}
+
+/* barbell */
+.bf-sf-lift { animation: bf-sf-lift 2.3s cubic-bezier(0.45, 0, 0.2, 1) infinite; }
+@keyframes bf-sf-lift {
+  0%, 100% { transform: translateY(7px); }
+  38%, 55% { transform: translateY(-3px); }
+}
+.bf-sf-shadow { animation: bf-sf-shadow 2.3s cubic-bezier(0.45, 0, 0.2, 1) infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes bf-sf-shadow { 0%, 100% { transform: scaleX(1); opacity: 0.25; } 38%, 55% { transform: scaleX(0.7); opacity: 0.1; } }
+.bf-sf-spark { animation: bf-sf-spark 2.3s ease-out infinite; opacity: 0; }
+@keyframes bf-sf-spark {
+  0%, 34% { opacity: 0; }
+  42%     { opacity: 1; }
+  70%, 100% { opacity: 0; }
+}
+
+/* flame */
+.bf-sf-flicker { animation: bf-sf-flicker 1.5s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes bf-sf-flicker {
+  0%   { transform: scale(1, 1) skewX(0deg); }
+  35%  { transform: scale(0.96, 1.05) skewX(-3deg); }
+  70%  { transform: scale(1.03, 0.97) skewX(2deg); }
+  100% { transform: scale(0.98, 1.04) skewX(-1deg); }
+}
+.bf-sf-inner-flame { animation: bf-sf-inner 1.1s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes bf-sf-inner { from { transform: scale(1, 0.92); } to { transform: scale(0.92, 1.08); } }
+.bf-sf-ember { animation: bf-sf-ember 2.8s ease-out infinite; opacity: 0; transform-box: fill-box; transform-origin: center; }
+@keyframes bf-sf-ember {
+  0%   { transform: translate(0, 10px) scale(1); opacity: 0; }
+  20%  { opacity: 0.9; }
+  100% { transform: translate(4px, -14px) scale(0.3); opacity: 0; }
+}
+
+/* people */
+.bf-sf-radar { animation: bf-sf-radar 2.6s ease-out infinite; transform-box: fill-box; transform-origin: center; opacity: 0; }
+@keyframes bf-sf-radar {
+  0%   { transform: scale(0.55); opacity: 0.55; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+/* bolt */
+.bf-sf-zap { animation: bf-sf-zap 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes bf-sf-zap {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
+  45%      { transform: scale(1.07); filter: drop-shadow(0 0 6px currentColor); }
+  55%      { transform: scale(0.98); }
+}
+
+/* footsteps */
+.bf-sf-print { animation: bf-sf-print 3.2s ease-in-out infinite; opacity: 0; transform-box: fill-box; transform-origin: center; }
+@keyframes bf-sf-print {
+  0%   { transform: scale(0.5); opacity: 0; }
+  14%  { transform: scale(1.08); opacity: 1; }
+  24%  { transform: scale(1); opacity: 0.95; }
+  62%  { opacity: 0.55; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-sf *, .bf-sf-wave-a, .bf-sf-wave-b { animation: none !important; }
+  .bf-sf-print { opacity: 0.75 !important; }
+  .bf-sf-spark, .bf-sf-radar, .bf-sf-heart-ring, .bf-sf-bubble, .bf-sf-ember, .bf-sf-z { opacity: 0 !important; }
+}
+
+/* ── Admin Monitor ─────────────────────────────────────────────────────────── */
+.bf-monitor-pulse { animation: bf-monitor-pulse 1.8s ease-out infinite; }
+@keyframes bf-monitor-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--dot, #00E27B) 70%, transparent); }
+  80%, 100% { box-shadow: 0 0 0 9px transparent; }
+}
+@media (min-width: 980px) {
+  .bf-monitor-layout { grid-template-columns: minmax(0, 1fr) 320px !important; align-items: start; }
+}
+@media (prefers-reduced-motion: reduce) { .bf-monitor-pulse { animation: none; } }

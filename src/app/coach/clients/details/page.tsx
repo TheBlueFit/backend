@@ -2,7 +2,7 @@
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, TrendingUp } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Dumbbell, TrendingUp } from 'lucide-react';
 import { dashboardAPI, CoachClient } from '@/services/api';
 
 // 1. Child component that uses the search params (?id=...)
@@ -11,6 +11,17 @@ function ClientDetailsContent() {
   const clientId = searchParams.get('id');
   const [client, setClient] = useState<CoachClient | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [schedules, setSchedules] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!clientId) return;
+    let cancelled = false;
+    dashboardAPI
+      .getClientSchedules(clientId)
+      .then((res) => { if (!cancelled) setSchedules(res.schedules || []); })
+      .catch(() => { if (!cancelled) setSchedules([]); });
+    return () => { cancelled = true; };
+  }, [clientId]);
 
   useEffect(() => {
     const load = async () => {
@@ -88,6 +99,30 @@ function ClientDetailsContent() {
               >
                 VIEW CHECK STATUS
               </Link>
+            </div>
+
+            <div style={{ marginTop: '28px' }}>
+              <div className="label-text" style={{ fontSize: '11px', marginBottom: '10px', color: 'var(--text-secondary)' }}>ASSIGNED WORKOUT PLANS</div>
+              {schedules.length === 0 ? (
+                <div style={{ padding: '18px', borderRadius: '12px', background: 'rgba(255,255,255,0.025)', color: 'var(--text-secondary)', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+                  <span>No plan assigned yet.</span>
+                  <Link href="/coach/templates" className="btn-secondary" style={{ textDecoration: 'none', fontSize: '12px' }}>Open templates to assign one</Link>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {schedules.map((sch) => (
+                    <div key={sch.assignmentId} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                      <span style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'rgba(96,165,250,0.09)', color: '#60A5FA', flexShrink: 0 }}><Dumbbell size={16} /></span>
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: '14px', fontWeight: 700 }}>{sch.templateTitle || 'Workout plan'}</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                          <CalendarDays size={12} /> Starts {sch.startDate}{sch.workoutDays ? ` · ${sch.workoutDays}` : ''}{sch.exercises?.length ? ` · ${sch.exercises.length} exercises` : ''}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Clock } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, RotateCcw } from "lucide-react";
 
 import { GlassCard } from "@/components/GlassCard";
 import ClientTrackerDashboard from "@/components/client/ClientTrackerDashboard";
@@ -56,6 +56,23 @@ export default function AthleteDashboard() {
     fetchDashboard().catch(() => { if (mounted) setIsLoading(false); });
     return () => { mounted = false; };
   }, [fetchDashboard]);
+
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [workoutError, setWorkoutError] = useState<string | null>(null);
+
+  // Mark an assigned workout done / not done, then refresh today's numbers.
+  const toggleWorkout = async (assignmentId: string, completed: boolean) => {
+    setTogglingId(assignmentId);
+    setWorkoutError(null);
+    try {
+      await dashboardAPI.logWorkout(assignmentId, completed);
+      await fetchDashboard();
+    } catch (err: any) {
+      setWorkoutError(err?.message || "Could not update this workout.");
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   const handleHealthSync = (healthData: {
     steps?: number;
@@ -125,10 +142,29 @@ export default function AthleteDashboard() {
               No training scheduled for today yet.
             </div>
           ) : (
-            <div className="plan-cards-container">
-              {athleteData.todayTraining.map((training: any) => (
-                <GlassCard key={training.id} title={training.title} subtitle={training.subtitle} statusText={training.statusText} statusColor={training.statusColor} Icon={training.statusText === "completed" ? CheckCircle2 : Clock} />
-              ))}
+            <div className="plan-cards-container" style={{ flexDirection: "column" }}>
+              {workoutError && <div className="error-banner">{workoutError}</div>}
+              {athleteData.todayTraining.map((training: any) => {
+                const done = training.statusText === "completed";
+                const busy = togglingId === training.assignmentId;
+                return (
+                  <div key={training.id}>
+                    <GlassCard title={training.title} subtitle={training.subtitle} statusText={training.statusText} statusColor={training.statusColor} Icon={done ? CheckCircle2 : Clock} />
+                    {training.assignmentId && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => toggleWorkout(training.assignmentId, !done)}
+                        className={done ? "btn-secondary" : "btn-primary"}
+                        style={{ marginTop: 8, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 12 }}
+                      >
+                        {busy ? <Loader2 size={14} className="spin" /> : done ? <RotateCcw size={14} /> : <CheckCircle2 size={14} />}
+                        {done ? "Undo — mark as not done" : "Mark workout as done"}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

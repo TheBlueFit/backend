@@ -49,7 +49,7 @@ export default function ThreeDayCheckStatus({ mode, clientId }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** Photo to display in the in-app MediaViewerModal — objectKey + display title. */
-  const [viewerPhoto, setViewerPhoto] = useState<{ objectKey: string; title: string } | null>(null);
+  const [viewerPhoto, setViewerPhoto] = useState<{ objectKey?: string; url?: string; title: string } | null>(null);
 
   const load = async () => {
     setIsLoading(true);
@@ -298,17 +298,15 @@ export default function ThreeDayCheckStatus({ mode, clientId }: Props) {
                       type="button"
                       className="btn-secondary"
                       style={{ display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer" }}
-                      onClick={() => {
-                        if (photo.objectKey) {
-                          setViewerPhoto({
-                            objectKey: photo.objectKey,
-                            title: `${photo.meal} · Day ${photo.day}`,
-                          });
-                        } else if (photo.viewUrl) {
-                          // Fallback for older records that only have viewUrl stored
-                          window.open(photo.viewUrl, "_blank", "noopener,noreferrer");
-                        }
-                      }}
+                      onClick={() =>
+                        // Always the in-app iframe viewer — an older record without an objectKey
+                        // falls back to its signed link, but still inside the app.
+                        setViewerPhoto({
+                          objectKey: photo.objectKey || undefined,
+                          url: photo.objectKey ? undefined : photo.viewUrl,
+                          title: `${photo.meal} · Day ${photo.day}`,
+                        })
+                      }
                     >
                       <ImageIcon size={14} /> View photo
                     </button>
@@ -341,6 +339,7 @@ export default function ThreeDayCheckStatus({ mode, clientId }: Props) {
     {viewerPhoto && (
       <MediaViewerModal
         objectKey={viewerPhoto.objectKey}
+        url={viewerPhoto.url}
         title={viewerPhoto.title}
         onClose={() => setViewerPhoto(null)}
       />

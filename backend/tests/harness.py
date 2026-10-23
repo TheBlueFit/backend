@@ -16,6 +16,7 @@ class HTTPException(Exception):
 class Cond:
     def __init__(self, fn): self.fn = fn
     def __and__(self, other): return Cond(lambda it: self.fn(it) and other.fn(it))
+    def __or__(self, other): return Cond(lambda it: self.fn(it) or other.fn(it))
 class Attr:
     def __init__(self, name): self.n = name
     def eq(self, v): return Cond(lambda it: it.get(self.n) == v)
@@ -59,8 +60,11 @@ class FakeTable:
             lhs = (ExpressionAttributeNames or {}).get(lhs, lhs)
             it[lhs] = ExpressionAttributeValues[rhs]; out[lhs] = it[lhs]
         return {'Attributes': out} if ReturnValues else {}
-    def scan(self, FilterExpression=None, ExclusiveStartKey=None):
+    def scan(self, FilterExpression=None, ExclusiveStartKey=None, ProjectionExpression=None):
         items = [copy.deepcopy(v) for v in self.d.values() if FilterExpression is None or FilterExpression.fn(v)]
+        if ProjectionExpression:
+            keep = [k.strip() for k in ProjectionExpression.split(',')]
+            items = [{k: v for k, v in it.items() if k in keep} for it in items]
         return {'Items': items}
     def query(self, KeyConditionExpression, ScanIndexForward=True, Limit=None, ExclusiveStartKey=None):
         items = sorted((copy.deepcopy(v) for v in self.d.values() if KeyConditionExpression.fn(v)),

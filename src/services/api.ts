@@ -206,6 +206,75 @@ export interface ThreeDayLogResponse {
   status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETE';
 }
 
+export interface ProgressPhoto {
+  angle: 'front' | 'side' | 'back' | string;
+  objectKey: string;
+  uploadedAt?: string;
+}
+
+export interface ProgressCheckin {
+  id: string;
+  date: string;
+  weight?: number | null;
+  waist?: number | null;
+  adherence?: string | null;
+  adherenceScore?: number | null;
+  workoutQuality?: string | null;
+  notes: string;
+  photos: ProgressPhoto[];
+}
+
+export interface ClientProgress {
+  client: { id: string; name: string; goal: string };
+  checkins: ProgressCheckin[];
+  summary: { weightChange: number | null; averageAdherence: number | null; totalCheckins: number };
+}
+
+export type Presence = 'ONLINE' | 'TODAY' | 'RECENT' | 'INACTIVE' | 'NEVER';
+
+export interface MonitorUser {
+  id: string;
+  pk: string;
+  name: string;
+  email: string;
+  role: 'CLIENT' | 'COACH';
+  accountStatus: 'ACTIVE' | 'LOCKED' | 'DISABLED';
+  presence: Presence;
+  lastSeenAt: string | null;
+  lastLoginAt: string | null;
+  loginCount: number;
+  createdAt?: string | null;
+  pendingFirstLogin: boolean;
+  lastCheckInAt: string | null;
+  lastWorkoutDate: string | null;
+  // clients
+  coachId?: string | null;
+  coachName?: string | null;
+  workoutsThisWeek?: number;
+  checkinsTotal?: number;
+  plansAssigned?: number;
+  threeDayEntries?: number;
+  onboardingCompleted?: boolean;
+  // coaches
+  clientCount?: number;
+  clientsOnlineNow?: number;
+  clientsNeedingAttention?: number;
+  templates?: number;
+  specialization?: string;
+}
+
+export interface AdminMonitor {
+  generatedAt: string;
+  summary: {
+    totalClients: number; totalCoaches: number; onlineNow: number; activeToday: number;
+    neverSignedIn: number; inactive7d: number; unassignedClients: number;
+    lockedAccounts: number; disabledAccounts: number;
+  };
+  clients: MonitorUser[];
+  coaches: MonitorUser[];
+  recentEvents: { type: 'login' | 'checkin' | 'workout'; userId: string; name: string; role: string; at: string }[];
+}
+
 export const dashboardAPI = {
   // --- AUTH & FIRST-TIME SETUP ---
   login: async (role: 'CLIENT' | 'COACH' | 'ADMIN' | undefined, identifier: string, password: string) => {
@@ -253,6 +322,7 @@ export const dashboardAPI = {
 
   getAllUsers: () => apiFetch<any[]>('/admin/users'),
   getAdminData: () => apiFetch<{ stats: any[] }>('/admin/dashboard/stats'),
+  getAdminMonitor: () => apiFetch<AdminMonitor>('/admin/monitor'),
   updateUser: (userId: string, payload: Record<string, any>) =>
     apiFetch<{ message: string; user: any }>(`/admin/users/${encodeURIComponent(userId)}`, {
       method: 'PUT',
@@ -304,7 +374,7 @@ export const dashboardAPI = {
 
   // --- ATHLETE (CLIENT) ---
   getAthleteData: (_athleteId?: string, date?: string) =>
-    apiFetch<{ date: string; todayTraining: any[] }>(
+    apiFetch<{ date: string; todayTraining: any[]; [key: string]: any }>(
       `/athlete/${encodeURIComponent(sessionId())}/dashboard?date=${encodeURIComponent(date || getLocalDateISO())}`
     ),
 
@@ -367,6 +437,32 @@ export const dashboardAPI = {
     apiFetch<{ message: string; checkinId: string }>('/athlete/checkin', {
       method: 'POST',
       body: JSON.stringify(payload), // the server uses the signed-in athlete, not an ID from the browser
+    }),
+
+  // Weekly check-in progress photos (front / side / back) attach to the saved check-in
+  createProgressPhotoUpload: (payload: { checkinId: string; angle: string; fileName: string; contentType: string }) =>
+    apiFetch<ThreeDayPhotoUpload>('/athlete/checkin/photos/upload-url', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  completeProgressPhoto: (payload: { checkinId: string; angle: string; objectKey: string; originalFileName?: string }) =>
+    apiFetch<{ message: string; angle: string; objectKey: string }>('/athlete/checkin/photos/complete', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  // Coach "Progress Review": real check-in history for one assigned client
+  getClientProgress: (clientId: string) =>
+    apiFetch<ClientProgress>(
+      `/coach/${encodeURIComponent(sessionId())}/clients/${encodeURIComponent(clientId)}/progress`
+    ),
+
+  // Mark an assigned workout done / not done (defaults to today, in the device's local date)
+  logWorkout: (assignmentId: string, completed: boolean, date?: string) =>
+    apiFetch<{ message: string; date: string; assignmentId: string; completed: boolean }>('/athlete/workouts/log', {
+      method: 'PUT',
+      body: JSON.stringify({ assignmentId, completed, date: date || getLocalDateISO() }),
     }),
 
   saveHealthMetrics: (data: {

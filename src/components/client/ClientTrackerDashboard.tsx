@@ -570,7 +570,10 @@ export default function ClientTrackerDashboard({
               ? "Estimated activity energy"
               : "No activity data yet"
           }
+          progress={calories != null ? Math.min(100, (Number(calories) / 500) * 100) : undefined}
+          progressLabel="Of 500 kcal active goal"
           accent="#C98268"
+          fillerShape="flame"
           icon={<Flame size={18} />}
           compact
         />
@@ -621,7 +624,10 @@ export default function ClientTrackerDashboard({
               ? "Completed this week"
               : "No workout history yet"
           }
+          progress={workoutsThisWeek != null ? Math.min(100, (Number(workoutsThisWeek) / 4) * 100) : undefined}
+          progressLabel="Weekly goal · 4 sessions"
           accent="#A59AD5"
+          fillerShape="bolt"
           icon={<Trophy size={18} />}
           compact
         />
@@ -648,7 +654,7 @@ export default function ClientTrackerDashboard({
           progress={stepProgress}
           progressLabel="Goal"
           accent="#6DBBC3"
-          fillerShape="droplet"
+          fillerShape="footsteps"
           icon={
             <Activity size={18} />
           }

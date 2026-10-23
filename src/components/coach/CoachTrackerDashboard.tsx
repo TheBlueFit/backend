@@ -392,7 +392,10 @@ export default function CoachTrackerDashboard({
               ? "currently training"
               : "No clients assigned"
           }
+          progress={activeClients !== undefined && activeClients > 0 ? 100 : undefined}
+          progressLabel="Roster"
           accent="#68AFC3"
+          fillerShape="people"
           icon={<Users size={18} />}
         />
 
@@ -412,6 +415,7 @@ export default function CoachTrackerDashboard({
           progress={workoutCompletion}
           progressLabel="Completion"
           accent="#B89257"
+          fillerShape="barbell"
           icon={<Dumbbell size={18} />}
         />
 
@@ -431,6 +435,7 @@ export default function CoachTrackerDashboard({
           progress={sleepConsistency}
           progressLabel="Consistency"
           accent="#887DBC"
+          fillerShape="moon"
           icon={<Moon size={18} />}
         />
 
@@ -446,6 +451,7 @@ export default function CoachTrackerDashboard({
           progress={hydration}
           progressLabel="Hydration"
           accent="#579FAC"
+          fillerShape="droplet"
           icon={<Droplets size={18} />}
         />
       </section>

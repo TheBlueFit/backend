@@ -2,24 +2,27 @@
 /**
  * MediaViewerModal
  * ─────────────────
- * Renders any S3 media object (image) inside an in-app modal panel
- * using a short-lived presigned URL fetched from the backend.
+ * Shows a stored photo INSIDE the app as an iframe popup — the user never leaves
+ * the app or lands on a raw S3 link.
  *
- * WHY: Raw S3 presigned URLs opened in a browser tab leak session context,
- * break the in-app UX, and can't be styled. This component fetches the URL
- * via the authenticated /media/view endpoint and renders the image in-app.
+ * Pass either:
+ *   • objectKey – the S3 key; a short-lived signed link is requested from the
+ *                 authenticated /media/view endpoint, or
+ *   • url       – an already-signed link (older records that only carry viewUrl).
  *
- * Usage:
- *   <MediaViewerModal objectKey="clients/abc/photo.jpg" onClose={() => …} />
+ * The image is rendered by a sandboxed iframe (srcDoc, scripts only — no access to the
+ * app's storage or session) that has its own zoom / rotate / reset controls.
  */
 
-import React, { useEffect, useState } from "react";
-import { X, Loader2, AlertCircle, ZoomIn, ZoomOut, RotateCw } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { AlertCircle, Image as ImageIcon, Loader2, X } from "lucide-react";
 import { dashboardAPI } from "@/services/api";
 
 interface Props {
   /** The S3 object key (not a URL). */
-  objectKey: string;
+  objectKey?: string;
+  /** A ready-to-use signed image link, used when no objectKey is known. */
+  url?: string;
   /** Optional display title shown in the modal header. */
   title?: string;
   onClose: () => void;
@@ -27,16 +30,81 @@ interface Props {
 
 type LoadState = "loading" | "ready" | "error";
 
-export default function MediaViewerModal({ objectKey, title, onClose }: Props) {
-  const [loadState, setLoadState] = useState<LoadState>("loading");
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [zoom, setZoom] = useState(1);
-  const [rotation, setRotation] = useState(0);
+const esc = (value: string) =>
+  value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-  // Fetch presigned view URL from the backend
+/** Self-contained page that lives inside the iframe. */
+function buildFrameDoc(src: string, alt: string): string {
+  return `<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#050507;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+  #stage{position:absolute;inset:0 0 56px 0;overflow:auto;display:flex;padding:14px;-webkit-overflow-scrolling:touch}
+  #box{position:relative;margin:auto;flex:none}
+  #im{position:absolute;left:50%;top:50%;max-width:none;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.55);transition:width .18s ease,height .18s ease,transform .18s ease;user-select:none;-webkit-user-drag:none}
+  #bar{position:absolute;left:0;right:0;bottom:0;height:56px;display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(255,255,255,.04);border-top:1px solid rgba(255,255,255,.08)}
+  button{height:36px;min-width:40px;padding:0 12px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);color:#fff;font:600 13px inherit;cursor:pointer}
+  button:hover{background:rgba(255,255,255,.14)}
+  #pct{min-width:48px;text-align:center;font-size:12px;color:rgba(255,255,255,.65)}
+  #err{display:none;margin:auto;max-width:320px;text-align:center;line-height:1.5;color:rgba(255,255,255,.72);font-size:13px}
+  #err b{display:block;color:#ff6b61;font-size:15px;margin-bottom:6px}
+</style></head><body>
+<div id="stage">
+  <div id="box"><img id="im" alt="${esc(alt)}" src="${esc(src)}" draggable="false"></div>
+  <div id="err"><b>Can't show this photo</b>The link may have expired, or the format (for example HEIC) can't be previewed here. Close this window and try again.</div>
+</div>
+<div id="bar">
+  <button id="out" aria-label="Zoom out">−</button><span id="pct">100%</span><button id="in" aria-label="Zoom in">+</button>
+  <button id="rot" aria-label="Rotate">⟳ Rotate</button><button id="reset">Reset</button>
+</div>
+<script>
+(function(){
+  var im=document.getElementById('im'),box=document.getElementById('box'),stage=document.getElementById('stage'),
+      pct=document.getElementById('pct'),err=document.getElementById('err');
+  var zoom=1,rot=0,ready=false;
+  function layout(){
+    if(!ready)return;
+    var r90=rot%180!==0,nw=im.naturalWidth||1,nh=im.naturalHeight||1;
+    var ew=r90?nh:nw,eh=r90?nw:nh;
+    var fit=Math.min((stage.clientWidth-28)/ew,(stage.clientHeight-28)/eh,1);
+    var bw=ew*fit*zoom,bh=eh*fit*zoom;
+    box.style.width=bw+'px';box.style.height=bh+'px';
+    im.style.width=(r90?bh:bw)+'px';im.style.height=(r90?bw:bh)+'px';
+    im.style.transform='translate(-50%,-50%) rotate('+rot+'deg)';
+    pct.textContent=Math.round(zoom*100)+'%';
+  }
+  im.addEventListener('load',function(){ready=true;layout();});
+  im.addEventListener('error',function(){box.style.display='none';err.style.display='block';document.getElementById('bar').style.display='none';});
+  window.addEventListener('resize',layout);
+  document.getElementById('in').onclick=function(){zoom=Math.min(4,zoom+0.25);layout();};
+  document.getElementById('out').onclick=function(){zoom=Math.max(0.5,zoom-0.25);layout();};
+  document.getElementById('rot').onclick=function(){rot=(rot+90)%360;layout();};
+  document.getElementById('reset').onclick=function(){zoom=1;rot=0;layout();};
+  stage.addEventListener('dblclick',function(){zoom=zoom>1?1:2;layout();});
+})();
+</script></body></html>`;
+}
+
+export default function MediaViewerModal({ objectKey, url, title, onClose }: Props) {
+  const [loadState, setLoadState] = useState<LoadState>(url ? "ready" : "loading");
+  const [imageUrl, setImageUrl] = useState<string | null>(url ?? null);
+  const [errorMsg, setErrorMsg] = useState("");
+
   useEffect(() => {
+    if (url) {
+      setImageUrl(url);
+      setLoadState("ready");
+      return;
+    }
+    if (!objectKey) {
+      setErrorMsg("No photo was selected.");
+      setLoadState("error");
+      return;
+    }
     let cancelled = false;
+    setLoadState("loading");
     (async () => {
       try {
         const res = await dashboardAPI.getMediaViewUrl(objectKey);
@@ -46,222 +114,110 @@ export default function MediaViewerModal({ objectKey, title, onClose }: Props) {
         }
       } catch (err: any) {
         if (!cancelled) {
-          setErrorMsg(err.message || "Could not load image.");
+          setErrorMsg(err?.message || "Could not load image.");
           setLoadState("error");
         }
       }
     })();
     return () => { cancelled = true; };
-  }, [objectKey]);
+  }, [objectKey, url]);
 
-  // Escape key closes
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", h);
-    return () => document.removeEventListener("keydown", h);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Lock body scroll
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
   }, []);
 
-  const fileName = objectKey.split("/").pop() || "Image";
-  const displayTitle = title || fileName;
+  const displayTitle = title || objectKey?.split("/").pop() || "Photo";
+  const frameDoc = useMemo(
+    () => (imageUrl ? buildFrameDoc(imageUrl, displayTitle) : ""),
+    [imageUrl, displayTitle]
+  );
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{ position: "fixed", inset: 0, zIndex: 950, background: "rgba(0,0,0,0.88)", backdropFilter: "blur(10px)" }}
-      />
-
-      {/* Modal */}
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${displayTitle} photo viewer`}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position: "fixed", inset: 0, zIndex: 3000,
+        background: "rgba(0,0,0,0.86)", backdropFilter: "blur(10px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom))",
+      }}
+    >
       <div
         style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 951,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "env(safe-area-inset-top, 16px) 16px env(safe-area-inset-bottom, 16px)",
-          pointerEvents: "none",
+          width: "min(860px, 100%)", height: "min(88vh, 760px)",
+          display: "flex", flexDirection: "column",
+          background: "#08080c", border: "1px solid rgba(255,255,255,0.11)",
+          borderRadius: 20, overflow: "hidden", boxShadow: "0 30px 100px rgba(0,0,0,0.6)",
         }}
       >
         <div
           style={{
-            width: "100%",
-            maxWidth: "800px",
-            maxHeight: "100%",
-            background: "rgba(14,14,22,0.98)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: "20px",
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-            pointerEvents: "auto",
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+            padding: "13px 14px 13px 20px", flexShrink: 0,
+            borderBottom: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.022)",
           }}
         >
-          {/* Header */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "16px 20px",
-              borderBottom: "1px solid rgba(255,255,255,0.07)",
-              flexShrink: 0,
-            }}
-          >
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.12em", color: "#E5B869", margin: "0 0 2px", fontWeight: 700 }}>
-                Image Viewer
-              </p>
-              <p style={{ fontSize: "14px", fontWeight: 600, color: "#fff", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+            <span style={{ width: 34, height: 34, borderRadius: 10, display: "grid", placeItems: "center", background: "rgba(229,184,105,0.1)", color: "#E5B869", flexShrink: 0 }}>
+              <ImageIcon size={16} />
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "#E5B869", fontWeight: 700 }}>Photo viewer</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {displayTitle}
-              </p>
-            </div>
-
-            {/* Controls */}
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-              {loadState === "ready" && (
-                <>
-                  <button
-                    onClick={() => setZoom(z => Math.max(0.25, z - 0.25))}
-                    title="Zoom out"
-                    style={controlBtn}
-                  >
-                    <ZoomOut size={16} />
-                  </button>
-                  <span style={{ fontSize: "12px", color: "var(--text-secondary)", minWidth: "36px", textAlign: "center" }}>
-                    {Math.round(zoom * 100)}%
-                  </span>
-                  <button
-                    onClick={() => setZoom(z => Math.min(4, z + 0.25))}
-                    title="Zoom in"
-                    style={controlBtn}
-                  >
-                    <ZoomIn size={16} />
-                  </button>
-                  <button
-                    onClick={() => setRotation(r => (r + 90) % 360)}
-                    title="Rotate"
-                    style={controlBtn}
-                  >
-                    <RotateCw size={16} />
-                  </button>
-                </>
-              )}
-              <button
-                onClick={onClose}
-                aria-label="Close viewer"
-                style={{ ...controlBtn, marginLeft: "4px" }}
-              >
-                <X size={18} />
-              </button>
+              </div>
             </div>
           </div>
-
-          {/* Image area */}
-          <div
-            style={{
-              flex: 1,
-              overflow: "auto",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "20px",
-              minHeight: "300px",
-              background: "rgba(0,0,0,0.4)",
-            }}
+          <button
+            type="button" onClick={onClose} aria-label="Close photo viewer"
+            style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.05)", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
           >
-            {loadState === "loading" && (
-              <div style={{ textAlign: "center", color: "var(--text-secondary)" }}>
-                <Loader2 size={32} style={{ animation: "spin 1s linear infinite", marginBottom: "12px" }} />
-                <p style={{ fontSize: "13px", margin: 0 }}>Loading image…</p>
-              </div>
-            )}
+            <X size={18} />
+          </button>
+        </div>
 
-            {loadState === "error" && (
-              <div style={{ textAlign: "center", padding: "32px" }}>
-                <AlertCircle size={36} color="#FF453A" style={{ marginBottom: "12px" }} />
-                <p style={{ color: "#FF453A", fontWeight: 600, margin: "0 0 8px" }}>Could not load image</p>
-                <p style={{ color: "var(--text-secondary)", fontSize: "13px", margin: 0 }}>{errorMsg}</p>
+        <div style={{ position: "relative", flex: 1, minHeight: 0, background: "#050507" }}>
+          {loadState === "loading" && (
+            <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "var(--text-secondary)", textAlign: "center" }}>
+              <div>
+                <Loader2 size={30} className="spin" style={{ marginBottom: 10 }} />
+                <p style={{ fontSize: 13, margin: 0 }}>Opening photo…</p>
               </div>
-            )}
+            </div>
+          )}
 
-            {loadState === "ready" && imageUrl && (
-              <div style={{ overflow: "auto", maxWidth: "100%", maxHeight: "100%" }}>
-                <img
-                  src={imageUrl}
-                  alt={displayTitle}
-                  style={{
-                    display: "block",
-                    maxWidth: "100%",
-                    borderRadius: "12px",
-                    transform: `scale(${zoom}) rotate(${rotation}deg)`,
-                    transformOrigin: "center center",
-                    transition: "transform 0.2s ease",
-                    cursor: zoom > 1 ? "grab" : "default",
-                  }}
-                  onError={() => {
-                    setLoadState("error");
-                    setErrorMsg("Image failed to load. The link may have expired.");
-                  }}
-                />
+          {loadState === "error" && (
+            <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", padding: 24, textAlign: "center" }}>
+              <div>
+                <AlertCircle size={34} color="#FF453A" style={{ marginBottom: 10 }} />
+                <p style={{ color: "#FF453A", fontWeight: 700, margin: "0 0 6px" }}>Could not load photo</p>
+                <p style={{ color: "var(--text-secondary)", fontSize: 13, margin: 0 }}>{errorMsg}</p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Footer */}
-          <div
-            style={{
-              padding: "12px 20px",
-              borderTop: "1px solid rgba(255,255,255,0.07)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexShrink: 0,
-            }}
-          >
-            <p style={{ fontSize: "11px", color: "var(--text-secondary)", margin: 0 }}>
-              {objectKey}
-            </p>
-            <button
-              onClick={onClose}
-              style={{
-                padding: "8px 20px",
-                background: "rgba(255,255,255,0.07)",
-                border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: "8px",
-                color: "#fff",
-                cursor: "pointer",
-                fontSize: "13px",
-                fontWeight: 600,
-              }}
-            >
-              Close
-            </button>
-          </div>
+          {loadState === "ready" && frameDoc && (
+            <iframe
+              title={`${displayTitle} photo`}
+              srcDoc={frameDoc}
+              sandbox="allow-scripts"
+              referrerPolicy="no-referrer"
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, background: "#050507" }}
+            />
+          )}
         </div>
       </div>
-    </>
+    </div>
   );
 }
-
-const controlBtn: React.CSSProperties = {
-  background: "rgba(255,255,255,0.07)",
-  border: "1px solid rgba(255,255,255,0.12)",
-  borderRadius: "8px",
-  color: "#fff",
-  cursor: "pointer",
-  padding: "6px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-};

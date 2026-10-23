@@ -8,7 +8,7 @@ import re
 import secrets
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -79,7 +79,13 @@ COACH_BASELINE_FIELDS = ('specialization',)
 # Fields an admin may see in the user directory. Password hashes, lockout counters
 # and health notes are NEVER part of this list.
 ADMIN_VIEW_FIELDS = ('PK', 'SK', 'role', 'name', 'email', 'userCode', 'coachId', 'status',
-                     'createdAt', 'onboardingCompleted', 'mustChangePassword')
+                     'createdAt', 'onboardingCompleted', 'mustChangePassword',
+                     'lastLoginAt', 'lastActiveAt', 'loginCount')
+
+ONLINE_WINDOW_SECONDS = 5 * 60       # "online now" = a request within the last 5 minutes
+ACTIVITY_TOUCH_SECONDS = 60          # write lastActiveAt at most once a minute per user
+PROGRESS_ANGLES = ('front', 'side', 'back')
+WEEKDAYS = ('mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')
 
 
 # ----------------------------- generic helpers -----------------------------
@@ -262,7 +268,42 @@ def current_user(authorization: Optional[str] = Header(default=None)) -> dict:
         raise HTTPException(status_code=401, detail="Invalid or expired session. Please sign in again.")
     if int(claims.get('iat', 0)) < int(profile.get('pwdChangedAt', 0)):
         raise HTTPException(status_code=401, detail="Invalid or expired session. Please sign in again.")
+    touch_activity(profile)
     return {"pk": profile['PK'], "role": profile.get('role'), "name": profile.get('name')}
+
+
+def touch_activity(profile: dict) -> None:
+    """Record 'last seen' for the admin Monitor. Throttled so it is at most one write a minute,
+    and never allowed to break the request it rides on."""
+    try:
+        last = parse_iso(profile.get('lastActiveAt', ''))
+        if last and (datetime.now(timezone.utc) - last).total_seconds() < ACTIVITY_TOUCH_SECONDS:
+            return
+        table.update_item(
+            Key={'PK': profile['PK'], 'SK': PROFILE_SK},
+            UpdateExpression="SET lastActiveAt = :t",
+            ExpressionAttributeValues={':t': now_iso()},
+        )
+    except Exception:
+        logger.warning('could not record activity for %s', profile.get('PK'))
+
+
+def record_login(profile: dict) -> None:
+    """Called when a session token is issued."""
+    try:
+        ts = now_iso()
+        table.update_item(
+            Key={'PK': profile['PK'], 'SK': PROFILE_SK},
+            UpdateExpression="SET lastLoginAt = :t, lastActiveAt = :t, loginCount = :n",
+            ExpressionAttributeValues={':t': ts, ':n': int(profile.get('loginCount', 0)) + 1},
+        )
+    except Exception:
+        logger.warning('could not record login for %s', profile.get('PK'))
+
+
+def is_coach_of(client_profile: Optional[dict], coach_pk: str) -> bool:
+    """coachId is stored either as the full key (COACH#CHR001) or the bare id (CHR001)."""
+    return bool(client_profile) and client_profile.get('coachId') in (coach_pk, short_id(coach_pk))
 
 
 def require_roles(*roles: str):
@@ -460,6 +501,16 @@ def template_out(item: dict) -> dict:
     return out
 
 
+def clean_reference_key(owner_pk: str, value: Optional[str]) -> str:
+    """A template's reference image must live in the owning coach's own media folder.
+    Without this check a coach could point a template at any client's photo (for example via a
+    hand-edited import file) and then open it through the template image viewer."""
+    key = (clean_text(value, 500) or '')
+    if key and (not key.startswith(f"coaches/{short_id(owner_pk)}/") or '..' in key.split('/')):
+        raise HTTPException(status_code=400, detail="Invalid reference image.")
+    return key
+
+
 def find_template(template_id: str, coach_pk: Optional[str]) -> Optional[dict]:
     """Direct get_item when the coach is known, otherwise (admin only) a filtered scan."""
     sk = f"TEMPLATE#{unquote(template_id)}"
@@ -630,6 +681,26 @@ class ThreeDayPhotoUploadPayload(BaseModel):
     contentType: str
 
 
+class ProgressPhotoUploadPayload(BaseModel):
+    checkinId: str
+    angle: str
+    fileName: str
+    contentType: str
+
+
+class ProgressPhotoCompletePayload(BaseModel):
+    checkinId: str
+    angle: str
+    objectKey: str
+    originalFileName: Optional[str] = None
+
+
+class WorkoutLogPayload(BaseModel):
+    assignmentId: str
+    date: Optional[str] = None
+    completed: bool = True
+
+
 class ThreeDayPhotoCompletePayload(BaseModel):
     day: int
     meal: str
@@ -699,6 +770,7 @@ def three_day_status(client_pk: str) -> dict:
             'meal': item.get('meal', ''),
             'originalFileName': item.get('originalFileName', ''),
             'contentType': item.get('contentType', ''),
+            'objectKey': item.get('objectKey', ''),
             'uploadedAt': item.get('uploadedAt', item.get('createdAt', '')),
             'viewUrl': view_url,
         })
@@ -806,6 +878,7 @@ def login(payload: LoginPayload):
     if profile.get('mustChangePassword'):
         # No session token until the temporary password has been replaced
         return session_payload(profile, with_token=False)
+    record_login(profile)
     return session_payload(profile, with_token=True)
 
 
@@ -853,6 +926,7 @@ def complete_setup(payload: CompleteSetupPayload):
         ExpressionAttributeValues=values,
     )
     fresh = get_profile(pk)
+    record_login(fresh)
     return {"message": "Setup completed", "user": session_payload(fresh, with_token=True)}
 
 
@@ -931,6 +1005,144 @@ def get_admin_dashboard(user: dict = Depends(require_roles('ADMIN'))):
             {"label": 'System Health', "value": '99.9%', "icon": 'Activity', "glowColor": 'var(--accent-green)', "isPulse": True},
         ]
     }
+
+
+def _age_seconds(iso: Optional[str]) -> Optional[int]:
+    dt = parse_iso(iso) if iso else None
+    return max(0, int((datetime.now(timezone.utc) - dt).total_seconds())) if dt else None
+
+
+def _presence(last_seen: Optional[str], ever_logged_in: bool) -> str:
+    """ONLINE (<5 min) / TODAY (<24 h) / RECENT (<7 d) / INACTIVE / NEVER (has not signed in yet)."""
+    if not ever_logged_in and not last_seen:
+        return 'NEVER'
+    age = _age_seconds(last_seen)
+    if age is None:
+        return 'INACTIVE'
+    if age <= ONLINE_WINDOW_SECONDS:
+        return 'ONLINE'
+    if age <= 86400:
+        return 'TODAY'
+    if age <= 7 * 86400:
+        return 'RECENT'
+    return 'INACTIVE'
+
+
+@app.get("/admin/monitor")
+def get_admin_monitor(user: dict = Depends(require_roles('ADMIN'))):
+    """Live roster for the admin Monitor page: every client and coach with sign-in and activity status."""
+    profiles = all_profiles()
+    names = {p['PK']: p.get('name') or short_id(p['PK']) for p in profiles}
+    # One light pass over the table (keys only) instead of a query per user.
+    rows = scan_all(
+        FilterExpression=Attr('SK').begins_with('CHECKIN#') | Attr('SK').begins_with('WORKOUTLOG#')
+        | Attr('SK').begins_with('SCHEDULE#') | Attr('SK').begins_with('TEMPLATE#') | Attr('SK').begins_with('3DAY'),
+        ProjectionExpression='PK, SK',
+    )
+    per: Dict[str, Dict[str, Any]] = {}
+    events: List[dict] = []
+    for r in rows:
+        bucket = per.setdefault(r['PK'], {'checkins': [], 'workouts': [], 'schedules': 0, 'templates': 0, 'threeDay': 0})
+        kind, _, rest = r['SK'].partition('#')
+        if kind == 'CHECKIN':
+            bucket['checkins'].append(rest)
+        elif kind == 'WORKOUTLOG':
+            bucket['workouts'].append(rest.split('#', 1)[0])
+        elif kind == 'SCHEDULE':
+            bucket['schedules'] += 1
+        elif kind == 'TEMPLATE':
+            bucket['templates'] += 1
+        elif kind.startswith('3DAY'):
+            bucket['threeDay'] += 1
+
+    now_ts = int(time.time())
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).strftime('%Y-%m-%d')
+    clients, coaches = [], []
+    summary = {'totalClients': 0, 'totalCoaches': 0, 'onlineNow': 0, 'activeToday': 0, 'neverSignedIn': 0,
+               'inactive7d': 0, 'unassignedClients': 0, 'lockedAccounts': 0, 'disabledAccounts': 0}
+
+    def base(p: dict, b: dict) -> dict:
+        last_checkin = max(b['checkins']) if b['checkins'] else None
+        last_workout = max(b['workouts']) if b['workouts'] else None
+        seen = [x for x in (p.get('lastActiveAt'), p.get('lastLoginAt'), last_checkin) if x]
+        last_seen = max(seen) if seen else None
+        ever = bool(p.get('lastLoginAt')) or bool(last_seen)
+        presence = _presence(last_seen, ever)
+        locked = int(p.get('lockedUntil', 0) or 0) > now_ts
+        disabled = p.get('status') == 'INACTIVE'
+        summary['onlineNow'] += presence == 'ONLINE'
+        summary['activeToday'] += presence in ('ONLINE', 'TODAY')
+        summary['neverSignedIn'] += presence == 'NEVER'
+        summary['inactive7d'] += presence == 'INACTIVE'
+        summary['lockedAccounts'] += locked
+        summary['disabledAccounts'] += disabled
+        for ts, kind in ((p.get('lastLoginAt'), 'login'), (last_checkin, 'checkin')):
+            if ts:
+                events.append({'type': kind, 'userId': short_id(p['PK']), 'name': p.get('name') or '', 'role': p.get('role'), 'at': ts})
+        return {
+            'id': short_id(p['PK']), 'pk': p['PK'], 'name': p.get('name') or 'Unnamed',
+            'email': p.get('email', ''), 'role': p.get('role'),
+            'accountStatus': 'DISABLED' if disabled else 'LOCKED' if locked else 'ACTIVE',
+            'presence': presence, 'lastSeenAt': last_seen,
+            'lastLoginAt': p.get('lastLoginAt'), 'loginCount': int(p.get('loginCount', 0) or 0),
+            'createdAt': p.get('createdAt'), 'pendingFirstLogin': bool(p.get('mustChangePassword')),
+            'lastCheckInAt': last_checkin, 'lastWorkoutDate': last_workout,
+        }
+
+    coach_clients_map: Dict[str, List[dict]] = {}
+    for p in profiles:
+        b = per.get(p['PK'], {'checkins': [], 'workouts': [], 'schedules': 0, 'templates': 0, 'threeDay': 0})
+        role = p.get('role')
+        if role == 'CLIENT':
+            row = base(p, b)
+            coach_ref = p.get('coachId') or ''
+            coach_pk = make_pk('COACH', coach_ref) if coach_ref else ''
+            row.update({
+                'coachId': short_id(coach_pk) if coach_pk else None,
+                'coachName': names.get(coach_pk) if coach_pk else None,
+                'workoutsThisWeek': sum(1 for d in b['workouts'] if d >= week_ago),
+                'checkinsTotal': len(b['checkins']),
+                'plansAssigned': b['schedules'],
+                'threeDayEntries': b['threeDay'],
+                'onboardingCompleted': bool(p.get('onboardingCompleted', False)),
+            })
+            summary['totalClients'] += 1
+            summary['unassignedClients'] += 0 if coach_pk else 1
+            clients.append(row)
+            if coach_pk:
+                coach_clients_map.setdefault(coach_pk, []).append(row)
+        elif role == 'COACH':
+            coaches.append((p, b))
+            summary['totalCoaches'] += 1
+
+    coach_rows = []
+    for p, b in coaches:
+        row = base(p, b)
+        mine = coach_clients_map.get(p['PK'], [])
+        row.update({
+            'clientCount': len(mine),
+            'clientsOnlineNow': sum(1 for c in mine if c['presence'] == 'ONLINE'),
+            'clientsNeedingAttention': sum(1 for c in mine if c['presence'] in ('INACTIVE', 'NEVER')),
+            'templates': b['templates'],
+            'specialization': p.get('specialization', ''),
+        })
+        coach_rows.append(row)
+
+    for c in clients:
+        for ts, kind in ((c['lastWorkoutDate'], 'workout'),):
+            if ts:
+                events.append({'type': kind, 'userId': c['id'], 'name': c['name'], 'role': 'CLIENT', 'at': ts})
+    events.sort(key=lambda e: e['at'], reverse=True)
+
+    clients.sort(key=lambda c: (c['lastSeenAt'] or ''), reverse=True)
+    coach_rows.sort(key=lambda c: (c['lastSeenAt'] or ''), reverse=True)
+    return parse_decimals({
+        'generatedAt': now_iso(),
+        'summary': summary,
+        'clients': clients,
+        'coaches': coach_rows,
+        'recentEvents': events[:25],
+    })
 
 
 @app.get("/admin/system-status")
@@ -1120,6 +1332,11 @@ def update_template(templateId: str, payload: TemplatePayload, coachId: Optional
     for key, limit in (('title', 100), ('description', 500), ('goal', 50), ('workoutDays', 50), ('activities', 50)):
         if key in changes:
             changes[key] = clean_text(changes[key], limit)
+    for key, limit in (('level', 50), ('estimatedDuration', 50), ('equipment', 200)):
+        if key in changes:
+            changes[key] = clean_text(changes[key], limit)
+    if 'referenceImageKey' in changes:
+        changes['referenceImageKey'] = clean_reference_key(item['PK'], changes['referenceImageKey'])
     if 'exercises' in changes:
         changes['exercises'] = clean_exercises(changes['exercises'])
 
@@ -1159,7 +1376,7 @@ def create_template(coachId: str, payload: TemplatePayload, user: dict = Depends
         "level": clean_text(data.get('level'), 50) or '',
         "estimatedDuration": clean_text(data.get('estimatedDuration'), 50) or '',
         "equipment": clean_text(data.get('equipment'), 200) or '',
-        "referenceImageKey": clean_text(data.get('referenceImageKey'), 500) or '',
+        "referenceImageKey": clean_reference_key(coach_pk, data.get('referenceImageKey')),
         "createdAt": now,
         "updatedAt": now,
     })
@@ -1638,6 +1855,64 @@ def get_coach_client_check_status(coachId: str, clientId: str, user: dict = Depe
 
 
 # ------------------------------- athlete -----------------------------------
+def schedule_days(spec: str) -> Optional[set]:
+    """'Mon / Wed / Fri' -> {0, 2, 4}. Empty or unreadable -> None (no fixed weekdays)."""
+    found = {WEEKDAYS.index(w) for w in (t.strip().lower()[:3] for t in re.split(r'[^A-Za-z]+', spec or '')) if w in WEEKDAYS}
+    return found or None
+
+
+def workout_summary(schedules: List[dict], logs: Dict[str, dict], day: str) -> dict:
+    """Today's sessions from the assigned plans, plus the last-7-days completion numbers."""
+    today = datetime.strptime(day, '%Y-%m-%d').date()
+    today_rows, planned, done = [], 0, 0
+    for offset in range(7):
+        d = today - timedelta(days=offset)
+        d_iso = d.isoformat()
+        for sched in schedules:
+            if (sched.get('startDate') or '0000-00-00') > d_iso:
+                continue
+            days = schedule_days(sched.get('workoutDays', ''))
+            if days is not None and d.weekday() not in days:
+                continue
+            logged = f"WORKOUTLOG#{d_iso}#{sched['assignmentId']}" in logs
+            planned += 1
+            done += 1 if logged else 0
+            if offset == 0:
+                count = len(sched.get('exercises') or [])
+                bits = [f"{count} exercises" if count else None, sched.get('estimatedDuration') or None]
+                today_rows.append({
+                    "id": f"SCHEDULE#{sched['assignmentId']}",
+                    "assignmentId": sched['assignmentId'],
+                    "title": sched.get('templateTitle') or 'Workout',
+                    "subtitle": ' · '.join(b for b in bits if b) or 'Assigned workout',
+                    "statusText": 'completed' if logged else 'pending',
+                    "statusColor": 'green' if logged else 'gold',
+                })
+    return {"today": today_rows, "done": done, "completion": round(100 * done / planned) if planned else None}
+
+
+@app.put("/athlete/workouts/log")
+def log_workout(payload: WorkoutLogPayload, user: dict = Depends(require_roles('CLIENT'))):
+    """Mark an assigned workout done (or not done) for a day. Feeds Today's training and the Workout tracker."""
+    client_pk = user['pk']
+    day = payload.date or datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    if not re.match(r'^\d{4}-\d{2}-\d{2}$', day):
+        raise HTTPException(status_code=400, detail='Invalid date.')
+    sched = table.get_item(Key={'PK': client_pk, 'SK': f'SCHEDULE#{payload.assignmentId}'}).get('Item')
+    if not sched or sched.get('status', 'ACTIVE') != 'ACTIVE':
+        raise HTTPException(status_code=404, detail='Workout plan not found.')
+    sk = f'WORKOUTLOG#{day}#{payload.assignmentId}'
+    if payload.completed:
+        ts = now_iso()
+        table.put_item(Item=to_dynamo({
+            'PK': client_pk, 'SK': sk, 'type': 'WORKOUT_LOG', 'assignmentId': payload.assignmentId,
+            'date': day, 'completedAt': ts, 'createdAt': ts,
+        }))
+    else:
+        table.delete_item(Key={'PK': client_pk, 'SK': sk})
+    return {'message': 'Workout updated', 'date': day, 'assignmentId': payload.assignmentId, 'completed': payload.completed}
+
+
 @app.get("/athlete/{athleteId}/dashboard")
 def get_athlete_dashboard(athleteId: str, date: Optional[str] = None, user: dict = Depends(current_user)):
     """Today's training. The browser passes its LOCAL date (?date=YYYY-MM-DD) so the
@@ -1656,18 +1931,29 @@ def get_athlete_dashboard(athleteId: str, date: Optional[str] = None, user: dict
     except Exception:
         pass
 
-    return parse_decimals({
+    schedules = [i for i in query_all(
+        KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with('SCHEDULE#')
+    ) if i.get('status', 'ACTIVE') == 'ACTIVE']
+    logs = {i['SK']: i for i in query_all(
+        KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with('WORKOUTLOG#')
+    )}
+    workout = workout_summary(schedules, logs, day)
+
+    today_training = [
+        {
+            "id": i['SK'],
+            "title": i.get('title', ''),
+            "subtitle": i.get('subtitle', ''),
+            "statusText": i.get('statusText', 'pending'),
+            "statusColor": i.get('statusColor', 'gold'),
+        }
+        for i in items
+    ] + workout['today']
+
+    out = {
         "date": day,
-        "todayTraining": [
-            {
-                "id": i['SK'],
-                "title": i.get('title', ''),
-                "subtitle": i.get('subtitle', ''),
-                "statusText": i.get('statusText', 'pending'),
-                "statusColor": i.get('statusColor', 'gold'),
-            }
-            for i in items
-        ],
+        "todayTraining": today_training,
+        "assignedSchedules": [_schedule_out(i) for i in schedules],
         "steps": health.get('steps'),
         "stepGoal": 10000,
         "sleepHours": health.get('sleepHours'),
@@ -1676,7 +1962,11 @@ def get_athlete_dashboard(athleteId: str, date: Optional[str] = None, user: dict
         "hydration": health.get('hydration'),
         "hydrationGoal": 3.0,
         "heartRate": health.get('heartRate'),
-    })
+        "workoutsThisWeek": workout['done'],
+    }
+    if workout['completion'] is not None:
+        out["workoutCompletion"] = workout['completion']
+    return parse_decimals(out)
 
 
 @app.post("/athlete/checkin")
@@ -1708,6 +1998,134 @@ def save_checkin(payload: CheckinPayload, user: dict = Depends(require_roles('CL
     return {"message": "Check-in saved", "checkinId": item['SK']}
 
 
+
+
+def validate_progress_angle(angle: str) -> str:
+    clean = (clean_text(angle, 20) or '').lower()
+    if clean not in PROGRESS_ANGLES:
+        raise HTTPException(status_code=400, detail='Angle must be front, side or back.')
+    return clean
+
+
+def progress_key_prefix(client_pk: str, checkin_id: str, angle: str) -> str:
+    stamp = re.sub(r'\D', '', checkin_id.split('#', 1)[-1])
+    return f"clients/{short_id(client_pk)}/progress/{stamp}/{angle}-"
+
+
+def own_checkin(client_pk: str, checkin_id: str) -> dict:
+    if not checkin_id.startswith('CHECKIN#'):
+        raise HTTPException(status_code=400, detail='Invalid check-in.')
+    item = table.get_item(Key={'PK': client_pk, 'SK': checkin_id}).get('Item')
+    if not item:
+        raise HTTPException(status_code=404, detail='Check-in not found.')
+    return item
+
+
+@app.post("/athlete/checkin/photos/upload-url")
+def create_progress_photo_upload(payload: ProgressPhotoUploadPayload, user: dict = Depends(require_roles('CLIENT'))):
+    client_pk = user['pk']
+    angle = validate_progress_angle(payload.angle)
+    own_checkin(client_pk, payload.checkinId)
+    if not CLIENT_MEDIA_BUCKET:
+        raise HTTPException(status_code=503, detail='Photo storage is not configured.')
+    if payload.contentType not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail='Unsupported image type.')
+    prefix = progress_key_prefix(client_pk, payload.checkinId, angle)
+    object_key = f"{prefix}{uuid.uuid4().hex}{ALLOWED_IMAGE_TYPES[payload.contentType]}"
+    try:
+        post = s3.generate_presigned_post(
+            Bucket=CLIENT_MEDIA_BUCKET,
+            Key=object_key,
+            Fields={'Content-Type': payload.contentType},
+            Conditions=[
+                {'Content-Type': payload.contentType},
+                ['content-length-range', 1, MAX_CLIENT_PHOTO_BYTES],
+                ['starts-with', '$key', prefix],
+            ],
+            ExpiresIn=300,
+        )
+    except ClientError:
+        raise HTTPException(status_code=503, detail='Unable to prepare photo upload.')
+    return {'uploadUrl': post['url'], 'fields': post['fields'], 'objectKey': object_key, 'expiresIn': 300}
+
+
+@app.post("/athlete/checkin/photos/complete")
+def complete_progress_photo(payload: ProgressPhotoCompletePayload, user: dict = Depends(require_roles('CLIENT'))):
+    client_pk = user['pk']
+    angle = validate_progress_angle(payload.angle)
+    own_checkin(client_pk, payload.checkinId)
+    if not CLIENT_MEDIA_BUCKET:
+        raise HTTPException(status_code=503, detail='Photo storage is not configured.')
+    if not payload.objectKey.startswith(progress_key_prefix(client_pk, payload.checkinId, angle)):
+        raise HTTPException(status_code=403, detail='You do not have access to this upload.')
+    try:
+        head = s3.head_object(Bucket=CLIENT_MEDIA_BUCKET, Key=payload.objectKey)
+    except ClientError:
+        raise HTTPException(status_code=400, detail='Uploaded photo could not be verified.')
+    content_type = head.get('ContentType', '')
+    size = int(head.get('ContentLength', 0))
+    if content_type not in ALLOWED_IMAGE_TYPES or size <= 0 or size > MAX_CLIENT_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail='Uploaded photo failed validation.')
+    ts = now_iso()
+    item = to_dynamo({
+        'PK': client_pk,
+        'SK': f"PROGRESSPHOTO#{payload.checkinId.split('#', 1)[1]}#{angle.upper()}",
+        'type': 'PROGRESS_PHOTO',
+        'checkinId': payload.checkinId,
+        'angle': angle,
+        'objectKey': payload.objectKey,
+        'contentType': content_type,
+        'size': size,
+        'originalFileName': clean_text(payload.originalFileName, 180) or payload.objectKey.rsplit('/', 1)[-1],
+        'uploadedAt': ts,
+    })
+    table.put_item(Item=item)
+    return {'message': 'Photo saved', 'angle': angle, 'objectKey': payload.objectKey}
+
+
+@app.get("/coach/{coachId}/clients/{clientId}/progress")
+def get_client_progress(coachId: str, clientId: str, user: dict = Depends(require_roles('COACH', 'ADMIN'))):
+    """Progress Review: real check-in history + progress photos for one assigned client."""
+    coach_pk = make_pk('COACH', coachId)
+    authorize_coach_scope(user, coach_pk)
+    client_pk = make_pk('CLIENT', clientId)
+    client = get_profile(client_pk)
+    if not client or client.get('role') != 'CLIENT':
+        raise HTTPException(status_code=404, detail='Client not found.')
+    if user['role'] == 'COACH' and not is_coach_of(client, user['pk']):
+        raise HTTPException(status_code=403, detail='You do not have access to this resource.')
+
+    checkins = latest_checkins(client_pk, 12)                 # newest first
+    photos = {}
+    for p in query_all(KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with('PROGRESSPHOTO#')):
+        photos.setdefault(p.get('checkinId', ''), []).append(
+            {'angle': p.get('angle', ''), 'objectKey': p.get('objectKey', ''), 'uploadedAt': p.get('uploadedAt', '')})
+
+    history = []
+    for c in reversed(checkins):                              # oldest -> newest for charts
+        history.append({
+            'id': c['SK'],
+            'date': c['SK'].split('#', 1)[1],
+            'weight': c.get('weight'),
+            'waist': c.get('waist'),
+            'adherence': c.get('adherence'),
+            'adherenceScore': adherence_score(c.get('adherence')),
+            'workoutQuality': c.get('workoutQuality'),
+            'notes': c.get('notes') or '',
+            'photos': sorted(photos.get(c['SK'], []), key=lambda x: x['angle']),
+        })
+    weights = [h['weight'] for h in history if h['weight'] is not None]
+    scores = [h['adherenceScore'] for h in history if h['adherenceScore'] is not None]
+    return parse_decimals({
+        'client': {'id': short_id(client_pk), 'name': client.get('name') or 'Unnamed Athlete',
+                   'goal': client.get('primaryGoal') or client.get('goal') or 'Not set'},
+        'checkins': history,
+        'summary': {
+            'weightChange': round(float(weights[-1]) - float(weights[0]), 1) if len(weights) > 1 else None,
+            'averageAdherence': round(sum(scores) / len(scores), 1) if scores else None,
+            'totalCheckins': len(history),
+        },
+    })
 
 
 @app.put("/athlete/health-metrics")
@@ -1799,6 +2217,8 @@ def get_template_image_view(
     if not item:
         raise HTTPException(status_code=404, detail='Template not found.')
     key = item.get('referenceImageKey', '')
+    if key and not key.startswith(f"coaches/{short_id(item['PK'])}/"):
+        key = ''   # legacy record pointing outside the coach's own folder: never sign it
     if not key or not CLIENT_MEDIA_BUCKET:
         raise HTTPException(status_code=404, detail='No reference image for this template.')
     try:
@@ -1836,7 +2256,7 @@ def assign_template_to_client(
     client_profile = get_profile(client_pk)
     if not client_profile or client_profile.get('role') != 'CLIENT':
         raise HTTPException(status_code=404, detail='Client not found.')
-    if client_profile.get('coachId') != coach_pk:
+    if not is_coach_of(client_profile, coach_pk):
         raise HTTPException(status_code=403, detail='This client is not assigned to you.')
 
     start_date = payload.startDate or now_iso()[:10]
@@ -1889,7 +2309,7 @@ def get_client_schedules(
     client_profile = get_profile(client_pk)
     if not client_profile or client_profile.get('role') != 'CLIENT':
         raise HTTPException(status_code=404, detail='Client not found.')
-    if client_profile.get('coachId') != coach_pk:
+    if not is_coach_of(client_profile, coach_pk):
         raise HTTPException(status_code=403, detail='This client is not assigned to you.')
 
     items = query_all(
@@ -1986,11 +2406,16 @@ def get_media_view_url(
         allowed_prefixes = [f'clients/{caller_short}/']
     elif role == 'COACH':
         allowed_prefixes = [f'coaches/{caller_short}/']
+        parts = unquote(objectKey).split('/')
+        if len(parts) > 2 and parts[0] == 'clients':
+            # a coach may open photos that belong to a client assigned to them
+            if is_coach_of(get_profile(make_pk('CLIENT', parts[1])), pk):
+                allowed_prefixes.append(f'clients/{parts[1]}/')
     elif role == 'ADMIN':
         allowed_prefixes = ['clients/', 'coaches/']  # admins can view any media
 
     decoded_key = unquote(objectKey)
-    if not any(decoded_key.startswith(p) for p in allowed_prefixes):
+    if '..' in decoded_key.split('/') or not any(decoded_key.startswith(p) for p in allowed_prefixes):
         raise HTTPException(status_code=403, detail='Access denied to this media object.')
 
     try:
