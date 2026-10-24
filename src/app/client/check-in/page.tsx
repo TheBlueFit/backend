@@ -11,7 +11,7 @@ type UploadedPhoto = { angle: string; file: File; preview: string };
 const inputStyle = {
   width: "100%",
   padding: "14px",
-  background: "rgba(0,0,0,0.4)",
+  background: "rgb(var(--well-rgb) / 0.4)",
   border: "1px solid var(--border-subtle)",
   borderRadius: "var(--radius-sm)",
   color: "var(--text-primary)",
@@ -146,8 +146,8 @@ export default function WeeklyCheckIn() {
     return (
       <div className="container" style={{ maxWidth: "600px", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "80vh" }}>
         <div className="app-card fade-in" style={{ textAlign: "center", padding: "40px 20px" }}>
-          <div style={{ width: "80px", height: "80px", background: "rgba(0,226,123,0.1)", border: "1px solid var(--accent-green)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
-            <CheckCircle2 size={40} color="#00E27B" />
+          <div style={{ width: "80px", height: "80px", background: "rgb(var(--green-rgb) / 0.1)", border: "1px solid var(--accent-green)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
+            <CheckCircle2 size={40} color="var(--accent-green)" />
           </div>
           <h2 className="animated-gradient-text" style={{ fontSize: "28px", marginBottom: "12px", textTransform: "none" }}>Check-In Complete</h2>
           <p style={{ color: "var(--text-secondary)", marginBottom: "32px", fontSize: "15px" }}>
@@ -201,17 +201,17 @@ export default function WeeklyCheckIn() {
               <div>
                 <label className="label-text">Diet Adherence</label>
                 <select name="adherence" style={selectStyle}>
-                  <option value="strict" style={{ background: "#111" }}>Strictly followed the plan</option>
-                  <option value="mostly" style={{ background: "#111" }}>Mostly followed, minor slips</option>
-                  <option value="struggled" style={{ background: "#111" }}>Struggled this week</option>
+                  <option value="strict" style={{ background: "var(--bg-elev)" }}>Strictly followed the plan</option>
+                  <option value="mostly" style={{ background: "var(--bg-elev)" }}>Mostly followed, minor slips</option>
+                  <option value="struggled" style={{ background: "var(--bg-elev)" }}>Struggled this week</option>
                 </select>
               </div>
               <div>
                 <label className="label-text">Workout Quality</label>
                 <select name="workoutQuality" style={selectStyle}>
-                  <option value="strong" style={{ background: "#111" }}>Strong — progressed on lifts</option>
-                  <option value="maintained" style={{ background: "#111" }}>Maintained strength</option>
-                  <option value="weak" style={{ background: "#111" }}>Felt fatigued / weak</option>
+                  <option value="strong" style={{ background: "var(--bg-elev)" }}>Strong — progressed on lifts</option>
+                  <option value="maintained" style={{ background: "var(--bg-elev)" }}>Maintained strength</option>
+                  <option value="weak" style={{ background: "var(--bg-elev)" }}>Felt fatigued / weak</option>
                 </select>
               </div>
               <div>
@@ -224,7 +224,7 @@ export default function WeeklyCheckIn() {
           {/* Progress photos — wired to S3 */}
           <div style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", padding: "24px", backdropFilter: "blur(10px)" }}>
             <h3 style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-primary)", fontSize: "16px", marginBottom: "6px", fontWeight: "600" }}>
-              <Camera size={18} color="#60A5FA" /> Progress Photos
+              <Camera size={18} color="var(--blue)" /> Progress Photos
             </h3>
             <p style={{ color: "var(--text-secondary)", fontSize: "12px", marginBottom: "20px" }}>
               Optional — uploaded privately to your secure storage. Your coach can view them from their dashboard.
@@ -235,9 +235,9 @@ export default function WeeklyCheckIn() {
                 return (
                   <div key={angle} style={{ position: "relative" }}>
                     <label
-                      style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "130px", border: `2px dashed ${uploaded ? "var(--accent-green)" : "var(--border-subtle)"}`, borderRadius: "var(--radius-sm)", background: uploaded ? "rgba(0,226,123,0.05)" : "rgba(0,0,0,0.2)", cursor: "pointer", transition: "all 0.2s ease", textAlign: "center", padding: "10px", overflow: "hidden" }}
-                      onMouseOver={(e) => { if (!uploaded) { e.currentTarget.style.borderColor = "var(--accent-gold)"; e.currentTarget.style.background = "rgba(229,184,105,0.05)"; } }}
-                      onMouseOut={(e) => { if (!uploaded) { e.currentTarget.style.borderColor = "var(--border-subtle)"; e.currentTarget.style.background = "rgba(0,0,0,0.2)"; } }}
+                      style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "130px", border: `2px dashed ${uploaded ? "var(--accent-green)" : "var(--border-subtle)"}`, borderRadius: "var(--radius-sm)", background: uploaded ? "rgb(var(--green-rgb) / 0.05)" : "rgb(var(--well-rgb) / 0.2)", cursor: "pointer", transition: "all 0.2s ease", textAlign: "center", padding: "10px", overflow: "hidden" }}
+                      onMouseOver={(e) => { if (!uploaded) { e.currentTarget.style.borderColor = "var(--accent-gold)"; e.currentTarget.style.background = "rgb(var(--gold-rgb) / 0.05)"; } }}
+                      onMouseOut={(e) => { if (!uploaded) { e.currentTarget.style.borderColor = "var(--border-subtle)"; e.currentTarget.style.background = "rgb(var(--well-rgb) / 0.2)"; } }}
                     >
                       {uploaded ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -255,7 +255,7 @@ export default function WeeklyCheckIn() {
                       <button
                         type="button"
                         onClick={() => removePhoto(angle)}
-                        style={{ position: "absolute", top: "6px", right: "6px", background: "rgba(0,0,0,0.7)", border: "none", borderRadius: "50%", width: "22px", height: "22px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", zIndex: 10 }}
+                        style={{ position: "absolute", top: "6px", right: "6px", background: "rgb(var(--well-rgb) / 0.7)", border: "none", borderRadius: "50%", width: "22px", height: "22px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", zIndex: 10 }}
                         aria-label={`Remove ${angle} photo`}
                       >
                         <X size={13} color="#fff" />

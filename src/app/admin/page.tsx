@@ -92,7 +92,7 @@
 //   // Mock Admin KPIs
 //   const stats = [
 //     { label: 'Total Users', value: dbUsers.length.toString(), icon: Users, glowColor: 'var(--text-primary)' },
-//     { label: 'Active Coaches', value: coaches.length.toString(), icon: Shield, glowColor: '#60A5FA' },
+//     { label: 'Active Coaches', value: coaches.length.toString(), icon: Shield, glowColor: 'var(--blue)' },
 //     { label: 'Generated Diets', value: '840', icon: Utensils, glowColor: 'var(--accent-gold)' },
 //     { label: 'System Health', value: '99.9%', icon: Activity, glowColor: 'var(--accent-green)', isPulse: true },
 //   ];
@@ -110,7 +110,7 @@
 //           <button 
 //             onClick={fetchUsers} 
 //             className="btn-primary" 
-//             style={{ padding: '10px 20px', flex: 'none', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(229, 184, 105, 0.15)', color: 'var(--accent-gold)', border: '1px solid rgba(229, 184, 105, 0.4)', cursor: 'pointer' }}
+//             style={{ padding: '10px 20px', flex: 'none', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgb(var(--gold-rgb) / 0.15)', color: 'var(--accent-gold)', border: '1px solid rgb(var(--gold-rgb) / 0.4)', cursor: 'pointer' }}
 //           >
 //             <Database size={16} /> Sync Database
 //           </button>
@@ -172,7 +172,7 @@
 //               {isLoading ? (
 //                 <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>Syncing Database...</div>
 //               ) : fetchError ? (
-//                 <div style={{ padding: '24px', textAlign: 'center', color: '#FF453A', background: 'rgba(255, 69, 58, 0.1)', borderRadius: '8px', border: '1px solid rgba(255, 69, 58, 0.3)' }}>
+//                 <div style={{ padding: '24px', textAlign: 'center', color: 'var(--danger)', background: 'rgb(var(--red-rgb) / 0.1)', borderRadius: '8px', border: '1px solid rgb(var(--red-rgb) / 0.3)' }}>
 //                   Error: {fetchError}. Make sure your API is deployed and the URL in your .env file is correct.
 //                 </div>
 //               ) : dbUsers.length === 0 ? (
@@ -183,7 +183,7 @@
 //                     <div className="plan-card-left">
 //                       <span className="plan-item-name" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
 //                         {user.name || 'Unnamed User'}
-//                         {user.role === 'COACH' && <Shield size={14} color="#60A5FA" />}
+//                         {user.role === 'COACH' && <Shield size={14} color="var(--blue)" />}
 //                       </span>
 //                       <span className="plan-item-category">
 //                         {user.role || 'UNKNOWN'} • ID: <span style={{ color: 'var(--text-secondary)' }}>{user.PK ? user.PK.split('#')[1] : 'N/A'}</span>
@@ -214,7 +214,7 @@
 //                         </select>
 //                       )}
 
-//                       <button style={{ background: 'rgba(0, 122, 255, 0.1)', border: '1px solid rgba(0, 122, 255, 0.3)', color: '#60A5FA', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} title="Manage Access Level">
+//                       <button style={{ background: 'rgb(var(--blue-rgb) / 0.1)', border: '1px solid rgb(var(--blue-rgb) / 0.3)', color: 'var(--blue)', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} title="Manage Access Level">
 //                         <Key size={14} />
 //                       </button>
 //                       <button style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} title="Edit User">
@@ -224,7 +224,7 @@
 //                       {/* NEW: Wired Delete Button */}
 //                       <button 
 //                         onClick={() => handleDeleteUser(user.PK)}
-//                         style={{ background: 'rgba(255, 69, 58, 0.1)', border: '1px solid rgba(255, 69, 58, 0.3)', color: '#FF453A', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} 
+//                         style={{ background: 'rgb(var(--red-rgb) / 0.1)', border: '1px solid rgb(var(--red-rgb) / 0.3)', color: 'var(--danger)', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} 
 //                         title="Delete/Suspend User"
 //                       >
 //                         <Trash2 size={14} />
@@ -247,7 +247,7 @@
 //             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
               
 //               <div style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-//                 <div style={{ width: '48px', height: '48px', background: 'rgba(229, 184, 105, 0.1)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(229, 184, 105, 0.3)' }}>
+//                 <div style={{ width: '48px', height: '48px', background: 'rgb(var(--gold-rgb) / 0.1)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgb(var(--gold-rgb) / 0.3)' }}>
 //                   <Utensils className="neon-orange" size={24} />
 //                 </div>
 //                 <div>
@@ -268,7 +268,7 @@
 //             <div className="section-header" style={{ marginBottom: '16px' }}>
 //               <h2 style={{ fontSize: '16px' }}>Platform Analytics</h2>
 //             </div>
-//             <div className="error-banner" style={{ background: 'rgba(0, 226, 123, 0.1)', borderColor: 'rgba(0, 226, 123, 0.3)', color: '#FFF', textAlign: 'left', marginBottom: '24px' }}>
+//             <div className="error-banner" style={{ background: 'rgb(var(--green-rgb) / 0.1)', borderColor: 'rgb(var(--green-rgb) / 0.3)', color: 'var(--text-primary)', textAlign: 'left', marginBottom: '24px' }}>
 //               <strong style={{ display: 'block', marginBottom: '8px', color: 'var(--accent-green)' }}>Monthly Report Ready</strong>
 //               <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
 //                 System-wide analysis is complete. Client retention is up 12% and average adherence sits at 78%.
@@ -286,7 +286,7 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Users, Activity, Database, Plus, Edit2, Trash2, Key, PieChart, Utensils, X, Save, RefreshCw, Monitor } from 'lucide-react';
 import Link from 'next/link';
-import { authSession, dashboardAPI } from '@/services/api';
+import { AdminMonitor, authSession, dashboardAPI } from '@/services/api';
 
 export default function AdminDashboard() {
   const [currentUserName, setCurrentUserName] = useState("Administrator");
@@ -301,6 +301,7 @@ export default function AdminDashboard() {
   const [isSaving, setIsSaving] = useState(false);
   const [resetResult, setResetResult] = useState<{ userCode: string; tempPassword: string } | null>(null);
   const [isResetting, setIsResetting] = useState(false);
+  const [monitor, setMonitor] = useState<AdminMonitor | null>(null);
 
   useEffect(() => {
     const syncCurrentUser = () => {
@@ -331,6 +332,15 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchUsers();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Live platform numbers (who is online, inactive, unassigned…) from the same source as the Monitor page
+  useEffect(() => {
+    let alive = true;
+    const load = () => dashboardAPI.getAdminMonitor().then((m) => alive && setMonitor(m)).catch(() => {});
+    load();
+    const id = window.setInterval(() => { if (document.visibilityState === 'visible') load(); }, 30_000);
+    return () => { alive = false; window.clearInterval(id); };
+  }, []);
 
   const handleDeleteUser = async (userId: string) => {
     if (!confirm("Are you sure you want to delete this user?")) return;
@@ -412,9 +422,9 @@ export default function AdminDashboard() {
 
   const stats = [
     { label: 'Total Users', value: dbUsers.length.toString(), icon: Users, glowColor: 'var(--text-primary)' },
-    { label: 'Active Coaches', value: coaches.length.toString(), icon: Shield, glowColor: '#60A5FA' },
-    { label: 'Generated Diets', value: '840', icon: Utensils, glowColor: 'var(--accent-gold)' },
-    { label: 'System Health', value: '99.9%', icon: Activity, glowColor: 'var(--accent-green)', isPulse: true },
+    { label: 'Active Coaches', value: coaches.length.toString(), icon: Shield, glowColor: 'var(--blue)' },
+    { label: 'Clients', value: dbUsers.filter((u) => u.role === 'CLIENT').length.toString(), icon: Utensils, glowColor: 'var(--accent-gold)' },
+    { label: 'Online Now', value: monitor ? String(monitor.summary.onlineNow) : '—', icon: Activity, glowColor: 'var(--accent-green)', isPulse: true },
   ];
 
   return (
@@ -424,8 +434,8 @@ export default function AdminDashboard() {
       <div className="container" style={{ maxWidth: '1000px' }}>
         <div className="app-card fade-in">
           
-          <div className="section-header" style={{ justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
-            <div>
+          <div className="section-header" style={{ justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
+            <div style={{ minWidth: 0, flex: '1 1 260px' }}>
               <h1 className="glazy-title" style={{ fontSize: '32px', textTransform: 'none', marginBottom: '8px', margin: 0 }}>{`Welcome, ${currentUserName}`}</h1>
               <p className="label-text" style={{ textTransform: 'none', color: 'var(--text-secondary)', letterSpacing: '0', fontSize: '14px', margin: 0 }}>Global system oversight, user access management, and core services.</p>
             </div>
@@ -436,7 +446,7 @@ export default function AdminDashboard() {
             <button 
               onClick={fetchUsers} 
               className="btn-primary" 
-              style={{ padding: '10px 20px', flex: 'none', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(229, 184, 105, 0.15)', color: 'var(--accent-gold)', border: '1px solid rgba(229, 184, 105, 0.4)', cursor: 'pointer' }}
+              style={{ padding: '10px 20px', flex: 'none', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgb(var(--gold-rgb) / 0.15)', color: 'var(--accent-gold)', border: '1px solid rgb(var(--gold-rgb) / 0.4)', cursor: 'pointer' }}
             >
               <Database size={16} /> Sync Database
             </button>
@@ -479,7 +489,7 @@ export default function AdminDashboard() {
               onClick={() => setActiveTab('analytics')}
               style={{ padding: '12px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
             >
-              <PieChart size={16} /> Monthly Analysis
+              <PieChart size={16} /> Platform Analytics
             </button>
           </div>
 
@@ -496,7 +506,7 @@ export default function AdminDashboard() {
                 {isLoading ? (
                   <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>Syncing Database...</div>
                 ) : fetchError ? (
-                  <div style={{ padding: '24px', textAlign: 'center', color: '#FF453A', background: 'rgba(255, 69, 58, 0.1)', borderRadius: '8px', border: '1px solid rgba(255, 69, 58, 0.3)' }}>
+                  <div style={{ padding: '24px', textAlign: 'center', color: 'var(--danger)', background: 'rgb(var(--red-rgb) / 0.1)', borderRadius: '8px', border: '1px solid rgb(var(--red-rgb) / 0.3)' }}>
                     Error: {fetchError}. Make sure your API is deployed and the URL in your .env file is correct.
                   </div>
                 ) : dbUsers.length === 0 ? (
@@ -507,7 +517,7 @@ export default function AdminDashboard() {
                       <div className="plan-card-left">
                         <span className="plan-item-name" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           {user.name || 'Unnamed User'}
-                          {user.role === 'COACH' && <Shield size={14} color="#60A5FA" />}
+                          {user.role === 'COACH' && <Shield size={14} color="var(--blue)" />}
                         </span>
                         <span className="plan-item-category">
                           {user.role || 'UNKNOWN'} • ID: <span style={{ color: 'var(--text-secondary)' }}>{user.PK ? user.PK.split('#')[1] : 'N/A'}</span>
@@ -539,7 +549,7 @@ export default function AdminDashboard() {
                         <button
                           onClick={() => handleResetPassword(user)}
                           disabled={isResetting || user.role === 'ADMIN'}
-                          style={{ background: 'rgba(0, 122, 255, 0.1)', border: '1px solid rgba(0, 122, 255, 0.3)', color: '#60A5FA', padding: '8px', borderRadius: '8px', cursor: user.role === 'ADMIN' ? 'not-allowed' : 'pointer', opacity: user.role === 'ADMIN' ? 0.45 : 1 }}
+                          style={{ background: 'rgb(var(--blue-rgb) / 0.1)', border: '1px solid rgb(var(--blue-rgb) / 0.3)', color: 'var(--blue)', padding: '8px', borderRadius: '8px', cursor: user.role === 'ADMIN' ? 'not-allowed' : 'pointer', opacity: user.role === 'ADMIN' ? 0.45 : 1 }}
                           title="Generate temporary password"
                         >
                           {isResetting ? <RefreshCw size={14} className="animate-spin" /> : <Key size={14} />}
@@ -554,7 +564,7 @@ export default function AdminDashboard() {
 
                         <button 
                           onClick={() => handleDeleteUser(user.PK)}
-                          style={{ background: 'rgba(255, 69, 58, 0.1)', border: '1px solid rgba(255, 69, 58, 0.3)', color: '#FF453A', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} 
+                          style={{ background: 'rgb(var(--red-rgb) / 0.1)', border: '1px solid rgb(var(--red-rgb) / 0.3)', color: 'var(--danger)', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} 
                           title="Delete/Suspend User"
                         >
                           <Trash2 size={14} />
@@ -575,7 +585,7 @@ export default function AdminDashboard() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
                 
                 <div style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ width: '48px', height: '48px', background: 'rgba(229, 184, 105, 0.1)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(229, 184, 105, 0.3)' }}>
+                  <div style={{ width: '48px', height: '48px', background: 'rgb(var(--gold-rgb) / 0.1)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgb(var(--gold-rgb) / 0.3)' }}>
                     <Utensils className="neon-orange" size={24} />
                   </div>
                   <div>
@@ -595,12 +605,28 @@ export default function AdminDashboard() {
               <div className="section-header" style={{ marginBottom: '16px' }}>
                 <h2 style={{ fontSize: '16px' }}>Platform Analytics</h2>
               </div>
-              <div className="error-banner" style={{ background: 'rgba(0, 226, 123, 0.1)', borderColor: 'rgba(0, 226, 123, 0.3)', color: '#FFF', textAlign: 'left', marginBottom: '24px' }}>
-                <strong style={{ display: 'block', marginBottom: '8px', color: 'var(--accent-green)' }}>Monthly Report Ready</strong>
-                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  System-wide analysis is complete. Client retention is up 12% and average adherence sits at 78%.
-                </span>
-              </div>
+              {monitor ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
+                  {[
+                    { label: 'Active today', value: monitor.summary.activeToday, color: 'var(--blue)' },
+                    { label: 'Online now', value: monitor.summary.onlineNow, color: 'var(--accent-green)' },
+                    { label: 'Inactive 7d+', value: monitor.summary.inactive7d, color: 'var(--danger)' },
+                    { label: 'Never signed in', value: monitor.summary.neverSignedIn, color: 'var(--text-secondary)' },
+                    { label: 'Clients without a coach', value: monitor.summary.unassignedClients, color: 'var(--accent-gold)' },
+                    { label: 'Locked / disabled', value: monitor.summary.lockedAccounts + monitor.summary.disabledAccounts, color: 'var(--danger)' },
+                  ].map((m) => (
+                    <div key={m.label} className="macro-pill" style={{ flexDirection: 'column', alignItems: 'flex-start', padding: '16px', gap: '10px' }}>
+                      <span className="plan-item-category" style={{ margin: 0 }}>{m.label}</span>
+                      <strong style={{ fontSize: '24px', color: m.color }}>{m.value}</strong>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading platform numbers…</div>
+              )}
+              <p style={{ marginTop: '16px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                Live figures, refreshed every 30 seconds. Open the <Link href="/admin/monitor" style={{ color: 'var(--accent-gold)' }}>Monitor</Link> for per-user detail.
+              </p>
             </div>
           )}
 
@@ -608,7 +634,7 @@ export default function AdminDashboard() {
       </div>
 
       {resetResult && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.62)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgb(var(--well-rgb) / 0.62)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div className="app-card" style={{ width: 'min(460px, 100%)', padding: '26px' }}>
             <div className="section-header" style={{ justifyContent: 'space-between', marginBottom: '18px' }}>
               <div>
@@ -618,7 +644,7 @@ export default function AdminDashboard() {
               <button onClick={() => setResetResult(null)} style={{ background: 'transparent', border: 0, color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={18} /></button>
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.6 }}>Give this password to the user securely. It will only be shown here now, and the user must replace it at their next sign-in.</p>
-            <div style={{ marginTop: '18px', padding: '16px', borderRadius: '12px', background: 'rgba(229,184,105,0.08)', border: '1px solid rgba(229,184,105,0.25)' }}>
+            <div style={{ marginTop: '18px', padding: '16px', borderRadius: '12px', background: 'rgb(var(--gold-rgb) / 0.08)', border: '1px solid rgb(var(--gold-rgb) / 0.25)' }}>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>USER</div>
               <strong>{resetResult.userCode}</strong>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '14px', marginBottom: '6px' }}>TEMPORARY PASSWORD</div>
@@ -630,7 +656,7 @@ export default function AdminDashboard() {
       )}
 
       {editingUser && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,0.62)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgb(var(--well-rgb) / 0.62)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div className="app-card" style={{ width: 'min(620px, 100%)', maxHeight: '90vh', overflowY: 'auto', padding: '26px' }}>
             <div className="section-header" style={{ justifyContent: 'space-between', marginBottom: '20px' }}>
               <div>

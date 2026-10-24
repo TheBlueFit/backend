@@ -242,7 +242,7 @@ export default function ThreeDayCheckStatus({ mode, clientId }: Props) {
             const busy = !!uploading[uploadKey];
 
             return (
-              <div key={meal} style={{ padding: 14, border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", background: "rgba(0,0,0,0.18)" }}>
+              <div key={meal} style={{ padding: 14, border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", background: "rgb(var(--well-rgb) / 0.18)" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <div style={{ width: 28, height: 28, borderRadius: 9, display: "grid", placeItems: "center", background: "rgba(104,207,168,0.08)", color: "#68cfa8" }}>
@@ -264,10 +264,10 @@ export default function ThreeDayCheckStatus({ mode, clientId }: Props) {
                     onChange={(event) => setMeals((current) => ({ ...current, [meal]: event.target.value }))}
                     rows={2}
                     placeholder={`What did you have for ${meal.toLowerCase()}?`}
-                    style={{ width: "100%", boxSizing: "border-box", resize: "vertical", padding: 12, background: "rgba(0,0,0,0.32)", border: "1px solid var(--border-subtle)", borderRadius: "12px", color: "var(--text-primary)", outline: "none", fontSize: 12 }}
+                    style={{ width: "100%", boxSizing: "border-box", resize: "vertical", padding: 12, background: "rgb(var(--well-rgb) / 0.32)", border: "1px solid var(--border-subtle)", borderRadius: "12px", color: "var(--text-primary)", outline: "none", fontSize: 12 }}
                   />
                 ) : (
-                  <div style={{ padding: 12, borderRadius: 12, background: "rgba(0,0,0,0.28)", color: meals[meal] ? "var(--text-primary)" : "var(--text-secondary)", fontSize: 12, whiteSpace: "pre-wrap" }}>
+                  <div style={{ padding: 12, borderRadius: 12, background: "rgb(var(--well-rgb) / 0.28)", color: meals[meal] ? "var(--text-primary)" : "var(--text-secondary)", fontSize: 12, whiteSpace: "pre-wrap" }}>
                     {meals[meal] || "No food entry recorded."}
                   </div>
                 )}

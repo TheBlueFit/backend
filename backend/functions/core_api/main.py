@@ -32,9 +32,19 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------------
 TABLE_NAME = os.environ.get('TABLE_NAME', 'BlueFit-Table')
 AUTH_SECRET_ARN = os.environ.get('AUTH_SECRET_ARN')          # token-signing key (Secrets Manager)
-ALLOWED_ORIGINS = [o.strip() for o in os.environ.get('ALLOWED_ORIGINS', 'http://localhost:3000').split(',') if o.strip()]
+# Websites / apps that may call this API from a browser. The production web app (also what iPhone
+# users add to their home screen from Safari) and local development are always allowed.
+DEFAULT_ORIGINS = ','.join([
+    'http://localhost:3000',
+    'http://localhost',
+    'https://localhost',
+    'capacitor://localhost',
+    'https://bluefit-1g5.pages.dev',
+])
+ALLOWED_ORIGINS = [o.strip() for o in os.environ.get('ALLOWED_ORIGINS', DEFAULT_ORIGINS).split(',') if o.strip()]
 
-TOKEN_TTL_SECONDS = 12 * 60 * 60     # sessions last 12 hours
+TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60   # sessions last 30 days and slide forward while the app is used
+TOKEN_REFRESH_AFTER_SECONDS = 24 * 60 * 60   # the app asks for a fresh token once the current one is a day old
 MAX_FAILED_LOGINS = 5                # lock the account after this many wrong passwords...
 LOCK_SECONDS = 15 * 60               # ...for this long
 MIN_PASSWORD_LENGTH = 8
@@ -48,6 +58,7 @@ app.add_middleware(
     allow_origins=ALLOWED_ORIGINS,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
+    max_age=600,
 )
 
 dynamodb = boto3.resource('dynamodb')
@@ -65,6 +76,10 @@ CLIENT_MEDIA_BUCKET = os.environ.get('CLIENT_MEDIA_BUCKET')
 #   CLIENT#<id>   CHECKIN#<iso-timestamp>   weekly check-in
 #   CLIENT#<id>   TRAINING#<YYYY-MM-DD>#<n> a training task scheduled for that day
 #   COACH#<id>    TEMPLATE#<templateId>     reusable workout/plan template
+#   CLIENT#<id>   MSG#<iso-ts>#<n>          one chat message between a client and their coach
+#   CLIENT#<id>   THREAD#META               chat read-markers + the client's unread counter
+#   COACH#<id>    INBOX#<clientId>          the coach's inbox row for one client (last message + unread)
+#   CLIENT#<id>   HEALTH#<YYYY-MM-DD>       daily steps / sleep / water / calories / heart-rate snapshot
 # ---------------------------------------------------------------------------
 PROFILE_SK = 'PROFILE#BASELINE'
 ROLE_PREFIXES = {'CLIENT': 'CL', 'COACH': 'CH', 'ADMIN': 'AD'}   # CLIENT#CLS001, COACH#CHR001, ADMIN#ADH001
@@ -82,8 +97,15 @@ ADMIN_VIEW_FIELDS = ('PK', 'SK', 'role', 'name', 'email', 'userCode', 'coachId',
                      'createdAt', 'onboardingCompleted', 'mustChangePassword',
                      'lastLoginAt', 'lastActiveAt', 'loginCount')
 
-ONLINE_WINDOW_SECONDS = 5 * 60       # "online now" = a request within the last 5 minutes
-ACTIVITY_TOUCH_SECONDS = 60          # write lastActiveAt at most once a minute per user
+ONLINE_WINDOW_SECONDS = 150          # "online now" = heard from within 2.5 minutes (the app pings every 45 s while open)
+ACTIVITY_TOUCH_SECONDS = 30          # write lastActiveAt at most once every 30 s per user
+
+# Daily targets, shared by the athlete dashboard, the coach dashboard and the progress review
+STEP_GOAL = 10000
+SLEEP_GOAL = 8.0
+HYDRATION_GOAL = 3.0
+MESSAGE_MAX_LENGTH = 2000
+IMPORT_MAX_TEMPLATES = 25
 PROGRESS_ANGLES = ('front', 'side', 'back')
 WEEKDAYS = ('mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')
 
@@ -269,7 +291,8 @@ def current_user(authorization: Optional[str] = Header(default=None)) -> dict:
     if int(claims.get('iat', 0)) < int(profile.get('pwdChangedAt', 0)):
         raise HTTPException(status_code=401, detail="Invalid or expired session. Please sign in again.")
     touch_activity(profile)
-    return {"pk": profile['PK'], "role": profile.get('role'), "name": profile.get('name')}
+    return {"pk": profile['PK'], "role": profile.get('role'), "name": profile.get('name'),
+            "iat": int(claims.get('iat', 0))}
 
 
 def touch_activity(profile: dict) -> None:
@@ -286,6 +309,18 @@ def touch_activity(profile: dict) -> None:
         )
     except Exception:
         logger.warning('could not record activity for %s', profile.get('PK'))
+
+
+def record_logout(pk: str) -> None:
+    """Called on sign-out so the admin Monitor stops showing the person as 'online'."""
+    try:
+        table.update_item(
+            Key={'PK': pk, 'SK': PROFILE_SK},
+            UpdateExpression="SET lastLogoutAt = :t",
+            ExpressionAttributeValues={':t': now_iso()},
+        )
+    except Exception:
+        logger.warning('could not record logout for %s', pk)
 
 
 def record_login(profile: dict) -> None:
@@ -400,7 +435,47 @@ def adherence_score(value: Any) -> Optional[int]:
     return min(100, round(float(m.group(1)))) if m else None
 
 
-def summarize_client(profile: dict):
+def utc_today() -> str:
+    return datetime.now(timezone.utc).strftime('%Y-%m-%d')
+
+
+def date_window(end_iso: str, days: int) -> List[str]:
+    """`days` ISO dates ending at end_iso, oldest first."""
+    end = datetime.strptime(end_iso, '%Y-%m-%d').date()
+    return [(end - timedelta(days=n)).isoformat() for n in range(days - 1, -1, -1)]
+
+
+def health_range(client_pk: str, start_iso: str, end_iso: str) -> Dict[str, dict]:
+    """Daily health snapshots between two ISO dates (inclusive), keyed by date."""
+    items = query_all(KeyConditionExpression=Key('PK').eq(client_pk)
+                      & Key('SK').between(f"HEALTH#{start_iso}", f"HEALTH#{end_iso}"))
+    return {i['SK'].split('#', 1)[1]: i for i in items}
+
+
+def pct_of(value: Any, goal: float) -> Optional[int]:
+    try:
+        return round(min(float(value) / goal, 1.0) * 100)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+
+
+def health_view(item: Optional[dict]) -> dict:
+    item = item or {}
+    return {k: item.get(k) for k in ('steps', 'sleepHours', 'calories', 'heartRate', 'hydration')}
+
+
+def latest_health(client_pk: str):
+    """Most recent daily snapshot from the last two days -> (date, item) or (None, {}).
+    Looks one day ahead of UTC so a phone in a timezone that is already 'tomorrow' is included."""
+    today = datetime.now(timezone.utc).date()
+    rng = health_range(client_pk, (today - timedelta(days=1)).isoformat(), (today + timedelta(days=1)).isoformat())
+    if not rng:
+        return None, {}
+    day = max(rng)
+    return day, rng[day]
+
+
+def summarize_client(profile: dict, with_health: bool = False):
     """Returns (row for the roster, meta used by the dashboard feed). Only safe fields leave here."""
     checkins = latest_checkins(profile['PK'], 4)
     scores = [s for s in (adherence_score(c.get('adherence')) for c in checkins) if s is not None]
@@ -416,6 +491,17 @@ def summarize_client(profile: dict):
         "lastCheckIn": day_label(last_ts),
         "status": 'on-track' if on_track else 'needs-attention',
     }
+    if with_health:
+        pres = profile_presence(profile)
+        h_day, h_item = latest_health(profile['PK'])
+        row.update({
+            "presence": pres['presence'],
+            "lastSeenAt": pres['lastSeenAt'],
+            "stepsToday": h_item.get('steps'),
+            "stepsDate": h_day,
+            "stepGoal": STEP_GOAL,
+            "unreadMessages": 0,
+        })
     meta = {
         "lastTs": last_ts,
         "days": days,
@@ -641,6 +727,8 @@ class HealthMetricsPayload(BaseModel):
     calories: Optional[int] = None
     heartRate: Optional[int] = None
     hydration: Optional[float] = None   # litres
+    date: Optional[str] = None          # the phone's local date (YYYY-MM-DD); defaults to today in UTC
+    source: Optional[str] = None        # 'device' (phone sensors) or 'manual' (typed in by the athlete)
 
 
 
@@ -656,6 +744,10 @@ class TemplatePayload(BaseModel):
     equipment: Optional[str] = None
     referenceImageKey: Optional[str] = None
 
+
+
+class ImportTemplatesPayload(BaseModel):
+    templates: List[Dict[str, Any]]
 
 
 class AssignTemplatePayload(BaseModel):
@@ -929,6 +1021,29 @@ def complete_setup(payload: CompleteSetupPayload):
     record_login(fresh)
     return {"message": "Setup completed", "user": session_payload(fresh, with_token=True)}
 
+@app.post("/auth/refresh")
+def refresh_session(user: dict = Depends(current_user)):
+    """Swap a still-valid token for a fresh 30-day one. The app calls this in the background so people
+    who use it regularly are never asked to sign in again. Does not count as a new login."""
+    profile = get_profile(user['pk'])
+    if not profile or profile.get('mustChangePassword'):
+        raise HTTPException(status_code=401, detail="Invalid or expired session. Please sign in again.")
+    return session_payload(profile, with_token=True)
+
+
+@app.post("/auth/logout")
+def logout(user: dict = Depends(current_user)):
+    """Marks the person as signed out so the Monitor stops showing them as online."""
+    record_logout(user['pk'])
+    return {"message": "Signed out"}
+
+
+@app.post("/presence/ping")
+def presence_ping(user: dict = Depends(current_user)):
+    """Heartbeat sent by the open app every ~45 s. Authenticating already refreshes 'last seen';
+    the reply carries the unread-message count for the navigation badge."""
+    return {"serverTime": now_iso(), "unreadMessages": unread_message_count(user)}
+
 
 # -------------------------------- admin ------------------------------------
 @app.get("/admin/users")
@@ -997,12 +1112,13 @@ def save_onboarding(payload: OnboardingPayload, user: dict = Depends(require_rol
 def get_admin_dashboard(user: dict = Depends(require_roles('ADMIN'))):
     profiles = all_profiles()
     generated_diets = len(scan_all(FilterExpression=Attr('SK').begins_with('DIET#')))
+    online = sum(1 for u in profiles if u.get('role') != 'ADMIN' and profile_presence(u)['presence'] == 'ONLINE')
     return {
         "stats": [
             {"label": 'Total Users', "value": str(len(profiles)), "icon": 'Users', "glowColor": 'var(--text-primary)'},
             {"label": 'Active Coaches', "value": str(sum(1 for u in profiles if u.get('role') == 'COACH')), "icon": 'Shield', "glowColor": '#60A5FA'},
             {"label": 'Generated Diets', "value": str(generated_diets), "icon": 'Utensils', "glowColor": 'var(--accent-gold)'},
-            {"label": 'System Health', "value": '99.9%', "icon": 'Activity', "glowColor": 'var(--accent-green)', "isPulse": True},
+            {"label": 'Online Now', "value": str(online), "icon": 'Activity', "glowColor": 'var(--accent-green)', "isPulse": True},
         ]
     }
 
@@ -1012,14 +1128,15 @@ def _age_seconds(iso: Optional[str]) -> Optional[int]:
     return max(0, int((datetime.now(timezone.utc) - dt).total_seconds())) if dt else None
 
 
-def _presence(last_seen: Optional[str], ever_logged_in: bool) -> str:
-    """ONLINE (<5 min) / TODAY (<24 h) / RECENT (<7 d) / INACTIVE / NEVER (has not signed in yet)."""
+def _presence(last_seen: Optional[str], ever_logged_in: bool, signed_out: bool = False) -> str:
+    """ONLINE (heard from in the last 2.5 min) / TODAY (<24 h) / RECENT (<7 d) / INACTIVE / NEVER (has not signed in yet).
+    Someone who pressed Sign Out is never ONLINE, even if their last request was seconds ago."""
     if not ever_logged_in and not last_seen:
         return 'NEVER'
     age = _age_seconds(last_seen)
     if age is None:
         return 'INACTIVE'
-    if age <= ONLINE_WINDOW_SECONDS:
+    if age <= ONLINE_WINDOW_SECONDS and not signed_out:
         return 'ONLINE'
     if age <= 86400:
         return 'TODAY'
@@ -1028,35 +1145,64 @@ def _presence(last_seen: Optional[str], ever_logged_in: bool) -> str:
     return 'INACTIVE'
 
 
+def profile_presence(profile: dict) -> Dict[str, Any]:
+    """Presence for one profile, using the same rules as the Monitor (used by chat headers too)."""
+    active = profile.get('lastActiveAt') or profile.get('lastLoginAt')
+    logout = profile.get('lastLogoutAt')
+    signed_out = bool(logout) and (not active or str(active) <= str(logout))
+    seen = max([x for x in (profile.get('lastActiveAt'), profile.get('lastLoginAt')) if x], default=None)
+    return {
+        'presence': _presence(seen, bool(profile.get('lastLoginAt')) or bool(seen), signed_out),
+        'lastSeenAt': seen,
+        'signedOut': signed_out,
+    }
+
+
 @app.get("/admin/monitor")
 def get_admin_monitor(user: dict = Depends(require_roles('ADMIN'))):
     """Live roster for the admin Monitor page: every client and coach with sign-in and activity status."""
     profiles = all_profiles()
     names = {p['PK']: p.get('name') or short_id(p['PK']) for p in profiles}
-    # One light pass over the table (keys only) instead of a query per user.
+    # One light pass over the table (only the few fields needed) instead of a query per user.
     rows = scan_all(
         FilterExpression=Attr('SK').begins_with('CHECKIN#') | Attr('SK').begins_with('WORKOUTLOG#')
-        | Attr('SK').begins_with('SCHEDULE#') | Attr('SK').begins_with('TEMPLATE#') | Attr('SK').begins_with('3DAY'),
-        ProjectionExpression='PK, SK',
+        | Attr('SK').begins_with('SCHEDULE#') | Attr('SK').begins_with('TEMPLATE#') | Attr('SK').begins_with('3DAY')
+        | Attr('SK').begins_with('HEALTH#') | Attr('SK').begins_with('MSG#'),
+        ProjectionExpression='PK, SK, steps, completedAt, #st, sender',
+        ExpressionAttributeNames={'#st': 'status'},
     )
     per: Dict[str, Dict[str, Any]] = {}
-    events: List[dict] = []
+
+    def bucket_for(pk: str) -> Dict[str, Any]:
+        return per.setdefault(pk, {'checkins': [], 'workouts': [], 'workoutStamps': [], 'schedules': 0,
+                                   'templates': 0, 'threeDay': 0, 'health': {}, 'messagesSent': 0})
+
     for r in rows:
-        bucket = per.setdefault(r['PK'], {'checkins': [], 'workouts': [], 'schedules': 0, 'templates': 0, 'threeDay': 0})
+        bucket = bucket_for(r['PK'])
         kind, _, rest = r['SK'].partition('#')
         if kind == 'CHECKIN':
             bucket['checkins'].append(rest)
         elif kind == 'WORKOUTLOG':
             bucket['workouts'].append(rest.split('#', 1)[0])
+            if r.get('completedAt'):
+                bucket['workoutStamps'].append(r['completedAt'])
         elif kind == 'SCHEDULE':
-            bucket['schedules'] += 1
+            if r.get('status', 'ACTIVE') == 'ACTIVE':          # a cancelled plan is not an assigned plan
+                bucket['schedules'] += 1
         elif kind == 'TEMPLATE':
             bucket['templates'] += 1
         elif kind.startswith('3DAY'):
             bucket['threeDay'] += 1
+        elif kind == 'HEALTH':
+            bucket['health'][rest] = r.get('steps')
+        elif kind == 'MSG':
+            if r.get('sender') == 'CLIENT':
+                bucket['messagesSent'] += 1
 
+    events: List[dict] = []
     now_ts = int(time.time())
-    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).strftime('%Y-%m-%d')
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=6)).strftime('%Y-%m-%d')
     clients, coaches = [], []
     summary = {'totalClients': 0, 'totalCoaches': 0, 'onlineNow': 0, 'activeToday': 0, 'neverSignedIn': 0,
                'inactive7d': 0, 'unassignedClients': 0, 'lockedAccounts': 0, 'disabledAccounts': 0}
@@ -1064,10 +1210,11 @@ def get_admin_monitor(user: dict = Depends(require_roles('ADMIN'))):
     def base(p: dict, b: dict) -> dict:
         last_checkin = max(b['checkins']) if b['checkins'] else None
         last_workout = max(b['workouts']) if b['workouts'] else None
-        seen = [x for x in (p.get('lastActiveAt'), p.get('lastLoginAt'), last_checkin) if x]
+        pres = profile_presence(p)
+        seen = [x for x in (pres['lastSeenAt'], last_checkin) if x]
         last_seen = max(seen) if seen else None
         ever = bool(p.get('lastLoginAt')) or bool(last_seen)
-        presence = _presence(last_seen, ever)
+        presence = _presence(last_seen, ever, pres['signedOut'] and last_seen == pres['lastSeenAt'])
         locked = int(p.get('lockedUntil', 0) or 0) > now_ts
         disabled = p.get('status') == 'INACTIVE'
         summary['onlineNow'] += presence == 'ONLINE'
@@ -1083,28 +1230,34 @@ def get_admin_monitor(user: dict = Depends(require_roles('ADMIN'))):
             'id': short_id(p['PK']), 'pk': p['PK'], 'name': p.get('name') or 'Unnamed',
             'email': p.get('email', ''), 'role': p.get('role'),
             'accountStatus': 'DISABLED' if disabled else 'LOCKED' if locked else 'ACTIVE',
-            'presence': presence, 'lastSeenAt': last_seen,
-            'lastLoginAt': p.get('lastLoginAt'), 'loginCount': int(p.get('loginCount', 0) or 0),
+            'presence': presence, 'lastSeenAt': last_seen, 'signedOut': pres['signedOut'],
+            'lastLoginAt': p.get('lastLoginAt'), 'lastLogoutAt': p.get('lastLogoutAt'),
+            'loginCount': int(p.get('loginCount', 0) or 0),
             'createdAt': p.get('createdAt'), 'pendingFirstLogin': bool(p.get('mustChangePassword')),
             'lastCheckInAt': last_checkin, 'lastWorkoutDate': last_workout,
         }
 
+    empty = {'checkins': [], 'workouts': [], 'workoutStamps': [], 'schedules': 0, 'templates': 0,
+             'threeDay': 0, 'health': {}, 'messagesSent': 0}
     coach_clients_map: Dict[str, List[dict]] = {}
     for p in profiles:
-        b = per.get(p['PK'], {'checkins': [], 'workouts': [], 'schedules': 0, 'templates': 0, 'threeDay': 0})
+        b = per.get(p['PK'], empty)
         role = p.get('role')
         if role == 'CLIENT':
             row = base(p, b)
             coach_ref = p.get('coachId') or ''
             coach_pk = make_pk('COACH', coach_ref) if coach_ref else ''
+            steps_today = b['health'].get(today)
             row.update({
                 'coachId': short_id(coach_pk) if coach_pk else None,
                 'coachName': names.get(coach_pk) if coach_pk else None,
-                'workoutsThisWeek': sum(1 for d in b['workouts'] if d >= week_ago),
+                'workoutsThisWeek': len({d for d in b['workouts'] if d >= week_ago}),
                 'checkinsTotal': len(b['checkins']),
                 'plansAssigned': b['schedules'],
                 'threeDayEntries': b['threeDay'],
                 'onboardingCompleted': bool(p.get('onboardingCompleted', False)),
+                'stepsToday': steps_today,
+                'messagesSent': b['messagesSent'],
             })
             summary['totalClients'] += 1
             summary['unassignedClients'] += 0 if coach_pk else 1
@@ -1128,10 +1281,14 @@ def get_admin_monitor(user: dict = Depends(require_roles('ADMIN'))):
         })
         coach_rows.append(row)
 
-    for c in clients:
-        for ts, kind in ((c['lastWorkoutDate'], 'workout'),):
-            if ts:
-                events.append({'type': kind, 'userId': c['id'], 'name': c['name'], 'role': 'CLIENT', 'at': ts})
+    # Workout events use the real completion time (not just the date) so they sort correctly with logins and check-ins.
+    for p in profiles:
+        if p.get('role') != 'CLIENT':
+            continue
+        stamps = per.get(p['PK'], empty)['workoutStamps']
+        if stamps:
+            events.append({'type': 'workout', 'userId': short_id(p['PK']), 'name': p.get('name') or '',
+                           'role': 'CLIENT', 'at': max(stamps)})
     events.sort(key=lambda e: e['at'], reverse=True)
 
     clients.sort(key=lambda c: (c['lastSeenAt'] or ''), reverse=True)
@@ -1295,6 +1452,11 @@ def assign_coach(clientId: str, payload: AssignPayload, user: dict = Depends(req
     if not client or client.get('role') != 'CLIENT':
         raise HTTPException(status_code=404, detail="Client not found.")
 
+    previous = client.get('coachId')
+    if previous and make_pk('COACH', previous) != coach_pk:
+        # the former coach no longer sees this client in their inbox
+        table.delete_item(Key={'PK': make_pk('COACH', previous), 'SK': inbox_sk(client_pk)})
+
     response = table.update_item(
         Key={'PK': client_pk, 'SK': PROFILE_SK},
         UpdateExpression="SET coachId = :c, updatedAt = :u",
@@ -1356,14 +1518,11 @@ def get_coach_templates(coachId: str, user: dict = Depends(require_roles('COACH'
     return {"templates": [template_out(i) for i in items]}
 
 
-@app.post("/coach/{coachId}/templates")
-def create_template(coachId: str, payload: TemplatePayload, user: dict = Depends(require_roles('COACH', 'ADMIN'))):
-    coach_pk = make_pk('COACH', coachId)
-    authorize_coach_scope(user, coach_pk)
-    data = payload.model_dump(exclude_unset=True)
+def build_template_item(coach_pk: str, data: dict) -> dict:
+    """Validate form/import data and build the DynamoDB item for a new template."""
     exercises = clean_exercises(data.get('exercises')) or []
     now = now_iso()
-    item = to_dynamo({
+    return to_dynamo({
         "PK": coach_pk,
         "SK": f"TEMPLATE#tpl_{uuid.uuid4().hex[:8]}",
         "type": "TEMPLATE",
@@ -1380,342 +1539,515 @@ def create_template(coachId: str, payload: TemplatePayload, user: dict = Depends
         "createdAt": now,
         "updatedAt": now,
     })
+
+
+@app.post("/coach/{coachId}/templates")
+def create_template(coachId: str, payload: TemplatePayload, user: dict = Depends(require_roles('COACH', 'ADMIN'))):
+    coach_pk = make_pk('COACH', coachId)
+    authorize_coach_scope(user, coach_pk)
+    item = build_template_item(coach_pk, payload.model_dump(exclude_unset=True))
     table.put_item(Item=item)
     return template_out(item)
+
+
+# ---- bulk import of templates from JSON files ----
+# Field names other tools / spreadsheets commonly use, mapped to the ones the app stores.
+_TEMPLATE_KEYS = {
+    'title': ('title', 'name', 'program', 'plan', 'template'),
+    'description': ('description', 'summary', 'overview', 'about'),
+    'goal': ('goal', 'objective', 'focus'),
+    'level': ('level', 'difficulty', 'experience'),
+    'workoutDays': ('workoutdays', 'workout_days', 'days', 'schedule', 'weekdays'),
+    'estimatedDuration': ('estimatedduration', 'estimated_duration', 'duration', 'time'),
+    'equipment': ('equipment', 'gear'),
+}
+_EXERCISE_KEYS = {
+    'name': ('name', 'exercise', 'exercise_name', 'movement', 'title'),
+    'sets': ('sets', 'set', 'num_sets'),
+    'reps': ('reps', 'rep', 'repetitions', 'reps_time', 'reps/time', 'time'),
+    'rest': ('rest', 'rest_time', 'rest_period'),
+    'tempo': ('tempo',),
+    'weight': ('weight', 'load'),
+    'rpe': ('rpe',),
+    'notes': ('notes', 'note', 'cues', 'instructions', 'comments', 'coach_notes'),
+    'section': ('section', 'block', 'group', 'phase'),
+    'type': ('type', 'category', 'kind'),
+}
+
+
+def _pick_value(source: dict, names: tuple) -> str:
+    lowered = {str(k).strip().lower(): v for k, v in source.items()}
+    for name in names:
+        value = lowered.get(name)
+        if value is None or value == '' or value == []:
+            continue
+        if isinstance(value, (list, tuple)):
+            value = ' / '.join(str(v).strip() for v in value if str(v).strip())
+        return str(value).strip()
+    return ''
+
+
+def normalize_import_template(raw: Any) -> tuple:
+    """One imported JSON object -> (clean template data, warnings).  Raises ValueError with a readable reason.
+    Over-long text is shortened rather than rejected, so a good file is not refused over one long note."""
+    if not isinstance(raw, dict):
+        raise ValueError("Not a template object.")
+    lowered = {str(k).strip().lower(): v for k, v in raw.items()}
+    rows = next((lowered[k] for k in ('exercises', 'workout', 'movements', 'items') if isinstance(lowered.get(k), list)), None)
+    if not rows:
+        raise ValueError("No exercises found.")
+    warnings: List[str] = []
+    limits = {'title': 100, 'description': 500, 'goal': 50, 'level': 50, 'workoutDays': 50, 'estimatedDuration': 50, 'equipment': 200}
+    data: Dict[str, Any] = {key: _pick_value(raw, names)[:limits[key]] for key, names in _TEMPLATE_KEYS.items()}
+    ex_limits = {'name': 150, 'sets': 100, 'reps': 100, 'rest': 100, 'tempo': 100, 'weight': 100, 'rpe': 100,
+                 'notes': 500, 'section': 100, 'type': 100}
+    exercises = []
+    for index, row in enumerate(rows, start=1):
+        if not isinstance(row, dict):
+            warnings.append(f"Row {index} skipped (not an object).")
+            continue
+        ex = {key: _pick_value(row, names)[:ex_limits[key]] for key, names in _EXERCISE_KEYS.items()}
+        if not ex['name']:
+            warnings.append(f"Row {index} skipped (no exercise name).")
+            continue
+        exercises.append(ex)
+    if not exercises:
+        raise ValueError("No exercises with a name found.")
+    if len(exercises) > 100:
+        warnings.append("Only the first 100 exercises were kept.")
+        exercises = exercises[:100]
+    for i, ex in enumerate(exercises, start=1):
+        ex['order'] = str(i)
+        ex['id'] = str(i)
+    data['exercises'] = exercises
+    data['activities'] = f"{len(exercises)} Exercises"
+    return data, warnings
+
+
+@app.post("/coach/{coachId}/templates/import")
+def import_templates(coachId: str, payload: ImportTemplatesPayload,
+                     user: dict = Depends(require_roles('COACH', 'ADMIN'))):
+    """Create several templates at once from parsed JSON. Each is checked on its own: a bad one is
+    reported back and skipped, the good ones are still saved."""
+    coach_pk = make_pk('COACH', coachId)
+    authorize_coach_scope(user, coach_pk)
+    if not payload.templates:
+        raise HTTPException(status_code=400, detail="The file contains no templates.")
+    if len(payload.templates) > IMPORT_MAX_TEMPLATES:
+        raise HTTPException(status_code=400, detail=f"Import at most {IMPORT_MAX_TEMPLATES} templates at a time.")
+
+    created, skipped = [], []
+    for index, raw in enumerate(payload.templates, start=1):
+        label = _pick_value(raw, _TEMPLATE_KEYS['title']) if isinstance(raw, dict) else ''
+        try:
+            data, warnings = normalize_import_template(raw)
+            item = build_template_item(coach_pk, data)
+            table.put_item(Item=item)
+            created.append({**template_out(item), 'warnings': warnings})
+        except ValueError as exc:
+            skipped.append({'index': index, 'title': label or f"Template {index}", 'reason': str(exc)})
+        except HTTPException as exc:
+            skipped.append({'index': index, 'title': label or f"Template {index}", 'reason': str(exc.detail)})
+    return {"created": created, "skipped": skipped}
 
 
 @app.get("/coach/{coachId}/clients")
 def get_coach_clients(coachId: str, user: dict = Depends(require_roles('COACH', 'ADMIN'))):
     coach_pk = make_pk('COACH', coachId)
     authorize_coach_scope(user, coach_pk)
-    rows = [summarize_client(p)[0] for p in coach_clients(coach_pk)]
+    inbox = {r['SK']: r for r in query_all(KeyConditionExpression=Key('PK').eq(coach_pk) & Key('SK').begins_with('INBOX#'))}
+    rows = []
+    for p in coach_clients(coach_pk):
+        row = summarize_client(p, with_health=True)[0]
+        row['unreadMessages'] = int(inbox.get(inbox_sk(p['PK']), {}).get('unread', 0) or 0)
+        rows.append(row)
     rows.sort(key=lambda r: r['name'].lower())
-    return {"clients": rows}
+    return parse_decimals({"clients": rows})
 
 
 @app.get("/coach/{coachId}/dashboard")
-def get_coach_dashboard(
-    coachId: str,
-    user: dict = Depends(require_roles('COACH', 'ADMIN'))
-):
+def get_coach_dashboard(coachId: str, user: dict = Depends(require_roles('COACH', 'ADMIN'))):
+    """Coach overview. Every number comes from what clients actually recorded in the last 7 days:
+    check-ins (adherence), daily health snapshots (steps / sleep / water) and workout logs."""
     coach_pk = make_pk('COACH', coachId)
-
     authorize_coach_scope(user, coach_pk)
 
     clients = coach_clients(coach_pk)
-
-    summaries = [
-        (p, *summarize_client(p))
-        for p in clients
-    ]
-
-    # ---------------------------------------------------------
-    # Existing dashboard metrics
-    # ---------------------------------------------------------
+    today = utc_today()
+    days = date_window(today, 7)
+    window_end = (datetime.strptime(today, '%Y-%m-%d').date() + timedelta(days=1)).isoformat()
 
     total = len(clients)
-
-    checked_in = sum(
-        1
-        for _, _, meta in summaries
-        if meta['days'] is not None and meta['days'] <= 7
-    )
-
-    active = sum(
-        1
-        for profile in clients
-        if profile.get('status', 'ACTIVE') != 'INACTIVE'
-    )
-
-    retention = (
-        f"{round(100 * active / total)}%"
-        if total
-        else '0%'
-    )
-
-    # ---------------------------------------------------------
-    # Read recent client check-ins
-    #
-    # This uses the same existing latest_checkins() helper
-    # already used by summarize_client().
-    # ---------------------------------------------------------
-
-    all_checkins = []
+    checked_in = 0
+    adherence_scores: List[int] = []
+    step_pcts: List[int] = []
+    step_values: List[float] = []
+    sleep_pcts: List[int] = []
+    water_pcts: List[int] = []
+    planned_total = done_total = 0
+    day_steps: Dict[str, List[int]] = {d: [] for d in days}
+    day_work: Dict[str, Dict[str, int]] = {d: {'planned': 0, 'done': 0} for d in days}
+    roster: List[dict] = []
+    events: List[dict] = []
+    online_now = 0
 
     for profile in clients:
-        client_checkins = latest_checkins(profile['PK'], 7)
+        row, meta = summarize_client(profile)
+        pk = profile['PK']
+        if meta['days'] is not None and meta['days'] <= 7:
+            checked_in += 1
+        for c in latest_checkins(pk, 7):
+            s = adherence_score(c.get('adherence'))
+            if s is not None:
+                adherence_scores.append(s)
 
-        for checkin in client_checkins:
-            all_checkins.append({
-                **checkin,
-                '_clientId': short_id(profile['PK']),
-                '_clientName': profile.get('name') or 'Unnamed Athlete',
-            })
+        health = health_range(pk, days[0], window_end)
+        for d, item in health.items():
+            if item.get('steps') is not None:
+                p = pct_of(item['steps'], STEP_GOAL)
+                if p is not None:
+                    step_pcts.append(p)
+                    step_values.append(float(item['steps']))
+                    if d in day_steps:
+                        day_steps[d].append(p)
+            if item.get('sleepHours') is not None:
+                p = pct_of(item['sleepHours'], SLEEP_GOAL)
+                if p is not None:
+                    sleep_pcts.append(p)
+            if item.get('hydration') is not None:
+                p = pct_of(item['hydration'], HYDRATION_GOAL)
+                if p is not None:
+                    water_pcts.append(p)
 
-    # ---------------------------------------------------------
-    # Tracker: Workout Completion
-    # ---------------------------------------------------------
+        schedules = [i for i in query_all(KeyConditionExpression=Key('PK').eq(pk) & Key('SK').begins_with('SCHEDULE#'))
+                     if i.get('status', 'ACTIVE') == 'ACTIVE']
+        logs = {i['SK']: i for i in query_all(KeyConditionExpression=Key('PK').eq(pk) & Key('SK').begins_with('WORKOUTLOG#'))}
+        wk = workout_summary(schedules, logs, today)
+        planned_total += wk['planned']
+        done_total += wk['done']
+        for w in wk['week']:
+            if w['date'] in day_work:
+                day_work[w['date']]['planned'] += w['planned']
+                day_work[w['date']]['done'] += w['done']
+        for log in logs.values():
+            if log.get('completedAt'):
+                events.append({'ts': log['completedAt'], 'client': row['name'], 'id': row['id'],
+                               'action': 'Completed a workout', 'status': 'completed'})
 
-    workout_values = [
-        item.get('workoutCompleted')
-        for item in all_checkins
-        if item.get('workoutCompleted') is not None
-    ]
+        pres = profile_presence(profile)
+        online_now += pres['presence'] == 'ONLINE'
+        h_day = max(health) if health else None
+        h_item = health.get(h_day, {}) if h_day else {}
+        sevens = [float(health[d]['steps']) for d in days if d in health and health[d].get('steps') is not None]
+        roster.append({
+            **row,
+            'presence': pres['presence'],
+            'lastSeenAt': pres['lastSeenAt'],
+            'stepsToday': h_item.get('steps'),
+            'stepsDate': h_day,
+            'stepsAvg7d': round(sum(sevens) / len(sevens)) if sevens else None,
+            'sleepHours': h_item.get('sleepHours'),
+            'hydration': h_item.get('hydration'),
+            'workoutsDone7d': wk['done'],
+            'workoutsPlanned7d': wk['planned'],
+            'workoutCompletion': wk['completion'],
+        })
+        if meta['lastTs']:
+            weight = f" • {parse_decimals(meta['weight'])} kg" if meta['weight'] is not None else ''
+            events.append({'ts': meta['lastTs'], 'client': row['name'], 'id': row['id'],
+                           'action': f"Submitted weekly check-in{weight}",
+                           'status': 'completed' if (meta['latestScore'] or 0) >= 75 else 'alert'})
 
-    workout_completion = (
-        round(
-            100
-            * sum(
-                1
-                for value in workout_values
-                if bool(value)
-            )
-            / len(workout_values)
-        )
-        if workout_values
-        else 0
-    )
+    def avg(values: List[int]) -> Optional[int]:
+        return round(sum(values) / len(values)) if values else None
 
-    # ---------------------------------------------------------
-    # Tracker: Sleep Consistency
-    #
-    # 7 hours = 100%.
-    # Values above 7 hours are capped at 100%.
-    # ---------------------------------------------------------
+    active = sum(1 for p in clients if p.get('status', 'ACTIVE') != 'INACTIVE')
+    retention = f"{round(100 * active / total)}%" if total else '0%'
+    workout_completion = round(100 * done_total / planned_total) if planned_total else None
+    sleep_consistency = avg(sleep_pcts)
+    hydration = avg(water_pcts)
+    adherence = avg(adherence_scores)
+    steps_pct = avg(step_pcts)
+    avg_steps = round(sum(step_values) / len(step_values)) if step_values else None
 
-    sleep_scores = []
-
-    for item in all_checkins:
-        value = item.get('sleepHours')
-
-        if value is None:
-            continue
-
-        try:
-            hours = float(value)
-
-            score = min(
-                hours / 7.0,
-                1.0
-            ) * 100
-
-            sleep_scores.append(score)
-
-        except (TypeError, ValueError):
-            continue
-
-    sleep_consistency = (
-        round(sum(sleep_scores) / len(sleep_scores))
-        if sleep_scores
-        else 0
-    )
-
-    # ---------------------------------------------------------
-    # Tracker: Hydration
-    #
-    # 2.5L = 100%.
-    # ---------------------------------------------------------
-
-    hydration_scores = []
-
-    for item in all_checkins:
-        value = item.get('hydrationLiters')
-
-        if value is None:
-            continue
-
-        try:
-            liters = float(value)
-
-            score = min(
-                liters / 2.5,
-                1.0
-            ) * 100
-
-            hydration_scores.append(score)
-
-        except (TypeError, ValueError):
-            continue
-
-    hydration = (
-        round(sum(hydration_scores) / len(hydration_scores))
-        if hydration_scores
-        else 0
-    )
-
-    # ---------------------------------------------------------
-    # Tracker: Adherence
-    #
-    # We use the existing adherence_score() helper so the
-    # backend keeps one definition of adherence.
-    # ---------------------------------------------------------
-
-    adherence_scores = []
-
-    for item in all_checkins:
-        score = adherence_score(
-            item.get('adherence')
-        )
-
-        if score is not None:
-            adherence_scores.append(score)
-
-    adherence = (
-        round(
-            sum(adherence_scores)
-            / len(adherence_scores)
-        )
-        if adherence_scores
-        else 0
-    )
-
-    # ---------------------------------------------------------
-    # Tracker: Steps
-    #
-    # 8,000 steps = 100%.
-    # ---------------------------------------------------------
-
-    step_scores = []
-
-    for item in all_checkins:
-        value = item.get('steps')
-
-        if value is None:
-            continue
-
-        try:
-            steps = float(value)
-
-            score = min(
-                steps / 8000.0,
-                1.0
-            ) * 100
-
-            step_scores.append(score)
-
-        except (TypeError, ValueError):
-            continue
-
-    steps = (
-        round(sum(step_scores) / len(step_scores))
-        if step_scores
-        else 0
-    )
-
-    # ---------------------------------------------------------
-    # Recent activity feed
-    # ---------------------------------------------------------
-
-    feed = sorted(
-        (
-            summary
-            for summary in summaries
-            if summary[2]['lastTs']
-        ),
-        key=lambda summary: summary[2]['lastTs'],
-        reverse=True
-    )[:10]
-
-    activity = []
-
-    for _profile, row, meta in feed:
-
-        weight = (
-            f" • {parse_decimals(meta['weight'])} kg"
-            if meta['weight'] is not None
-            else ''
-        )
-
-        activity.append({
-            "id": row['id'],
-            "client": row['name'],
-            "action": (
-                f"Submitted weekly check-in{weight}"
-            ),
-            "status": (
-                'completed'
-                if (meta['latestScore'] or 0) >= 75
-                else 'alert'
-            ),
-            "time": time_ago(meta['lastTs']),
+    weekly = []
+    for d in days:
+        w = day_work[d]
+        weekly.append({
+            'date': d,
+            'stepsPct': avg(day_steps[d]),
+            'workoutPct': round(100 * w['done'] / w['planned']) if w['planned'] else None,
         })
 
-    # ---------------------------------------------------------
-    # Final response
-    # ---------------------------------------------------------
+    events.sort(key=lambda e: e['ts'], reverse=True)
+    activity = [{"id": f"{e['id']}-{i}", "client": e['client'], "action": e['action'], "status": e['status'],
+                 "time": time_ago(e['ts'])} for i, e in enumerate(events[:10])]
+    roster.sort(key=lambda r: (0 if r['status'] == 'needs-attention' else 1, r['name'].lower()))
 
-    return {
+    def stat(label: str, value: Any, icon: str, color: str) -> dict:
+        return {"label": label, "name": label, "value": value, "icon": icon, "glowColor": color}
+
+    return parse_decimals({
         "stats": [
-
-            # Existing metrics
-            {
-                "label": "Active Clients",
-                "name": "Active Clients",
-                "value": str(total),
-                "icon": "Users",
-                "glowColor": "#4facfe",
-            },
-
-            {
-                "label": "Weekly Check-ins",
-                "name": "Weekly Check-ins",
-                "value": f"{checked_in}/{total}",
-                "icon": "CheckCircle2",
-                "glowColor": "#E5B869",
-            },
-
-            {
-                "label": "Client Retention",
-                "name": "Client Retention",
-                "value": retention,
-                "icon": "TrendingUp",
-                "glowColor": "#00E27B",
-            },
-
-            # Tracker metrics
-            {
-                "label": "Workout Completion",
-                "name": "Workout Completion",
-                "value": workout_completion,
-                "icon": "Dumbbell",
-                "glowColor": "#5B8CFF",
-            },
-
-            {
-                "label": "Sleep Consistency",
-                "name": "Sleep Consistency",
-                "value": sleep_consistency,
-                "icon": "Moon",
-                "glowColor": "#8B7CFF",
-            },
-
-            {
-                "label": "Hydration",
-                "name": "Hydration",
-                "value": hydration,
-                "icon": "Droplets",
-                "glowColor": "#55B7FF",
-            },
-
-            {
-                "label": "Adherence",
-                "name": "Adherence",
-                "value": adherence,
-                "icon": "Activity",
-                "glowColor": "#62C7A5",
-            },
-
-            {
-                "label": "Steps",
-                "name": "Steps",
-                "value": steps,
-                "icon": "Footprints",
-                "glowColor": "#A08CFF",
-            },
+            stat("Active Clients", str(total), "Users", "#4facfe"),
+            stat("Weekly Check-ins", f"{checked_in}/{total}", "CheckCircle2", "#E5B869"),
+            stat("Client Retention", retention, "TrendingUp", "#00E27B"),
+            stat("Workout Completion", workout_completion, "Dumbbell", "#5B8CFF"),
+            stat("Sleep Consistency", sleep_consistency, "Moon", "#8B7CFF"),
+            stat("Hydration", hydration, "Droplets", "#55B7FF"),
+            stat("Adherence", adherence, "Activity", "#62C7A5"),
+            stat("Steps", steps_pct, "Footprints", "#A08CFF"),
         ],
-
+        "summary": {
+            "activeClients": total,
+            "onlineNow": online_now,
+            "workoutCompletion": workout_completion,
+            "sleepConsistency": sleep_consistency,
+            "hydration": hydration,
+            "adherence": adherence,
+            "stepsPct": steps_pct,
+            "avgSteps": avg_steps,
+            "stepGoal": STEP_GOAL,
+        },
+        "weekly": weekly,
+        "clients": roster,
         "recentActivity": activity,
+    })
+
+
+# ------------------------------- messaging ---------------------------------
+# One conversation per client, between that client and the coach they are assigned to.
+# Admins are deliberately NOT part of conversations (coach/client chats are private).
+class MessagePayload(BaseModel):
+    text: str
+    clientMsgId: Optional[str] = None
+
+
+THREAD_META_SK = 'THREAD#META'
+
+
+def inbox_sk(client_pk: str) -> str:
+    return f"INBOX#{short_id(client_pk)}"
+
+
+def thread_access(user: dict, client_id: str):
+    """Resolve a conversation and make sure the caller belongs to it.
+    Returns (client_pk, client_profile, coach_pk or None)."""
+    client_pk = make_pk('CLIENT', client_id)
+    if user['role'] not in ('CLIENT', 'COACH'):
+        raise HTTPException(status_code=403, detail="You do not have access to this conversation.")
+    if user['role'] == 'CLIENT' and user['pk'] != client_pk:
+        raise HTTPException(status_code=403, detail="You do not have access to this conversation.")
+    client = get_profile(client_pk)
+    if not client or client.get('role') != 'CLIENT':
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    coach_ref = client.get('coachId')
+    coach_pk = make_pk('COACH', coach_ref) if coach_ref else None
+    if user['role'] == 'COACH' and coach_pk != user['pk']:
+        raise HTTPException(status_code=403, detail="You do not have access to this conversation.")
+    return client_pk, client, coach_pk
+
+
+def message_out(item: dict, viewer_role: str) -> dict:
+    return {
+        'id': item['SK'],
+        'clientMsgId': item.get('clientMsgId') or None,
+        'sender': item.get('sender'),
+        'senderName': item.get('senderName', ''),
+        'text': item.get('text', ''),
+        'createdAt': item.get('createdAt', ''),
+        'mine': item.get('sender') == viewer_role,
     }
+
+
+def unread_message_count(user: dict) -> int:
+    """Unread messages for the navigation badge. Never allowed to break the request it rides on."""
+    try:
+        if user['role'] == 'CLIENT':
+            meta = table.get_item(Key={'PK': user['pk'], 'SK': THREAD_META_SK}).get('Item') or {}
+            return int(meta.get('clientUnread', 0) or 0)
+        if user['role'] == 'COACH':
+            rows = query_all(KeyConditionExpression=Key('PK').eq(user['pk']) & Key('SK').begins_with('INBOX#'))
+            return sum(int(r.get('unread', 0) or 0) for r in rows)
+    except Exception:
+        logger.warning('could not count unread messages for %s', user.get('pk'))
+    return 0
+
+
+def peer_summary(profile: Optional[dict], role: str) -> Optional[dict]:
+    if not profile:
+        return None
+    return {'id': short_id(profile['PK']), 'name': profile.get('name') or 'Unnamed', 'role': role,
+            **profile_presence(profile)}
+
+
+@app.get("/messages/threads")
+def list_threads(user: dict = Depends(require_roles('CLIENT', 'COACH'))):
+    """CLIENT: their single conversation with their coach.  COACH: one row per assigned client, newest first."""
+    if user['role'] == 'CLIENT':
+        client = get_profile(user['pk']) or {}
+        coach_ref = client.get('coachId')
+        coach = get_profile(make_pk('COACH', coach_ref)) if coach_ref else None
+        meta = table.get_item(Key={'PK': user['pk'], 'SK': THREAD_META_SK}).get('Item') or {}
+        last = latest_message(user['pk'])
+        return parse_decimals({'threads': [{
+            'clientId': short_id(user['pk']),
+            'peer': peer_summary(coach, 'COACH'),
+            'unread': int(meta.get('clientUnread', 0) or 0),
+            'lastMessageAt': last.get('createdAt') if last else None,
+            'lastMessageText': (last or {}).get('text', '')[:140],
+            'lastSender': (last or {}).get('sender'),
+        }]})
+
+    inbox = {r['SK']: r for r in query_all(KeyConditionExpression=Key('PK').eq(user['pk']) & Key('SK').begins_with('INBOX#'))}
+    rows = []
+    for p in coach_clients(user['pk']):
+        box = inbox.get(inbox_sk(p['PK']), {})
+        rows.append({
+            'clientId': short_id(p['PK']),
+            'peer': peer_summary(p, 'CLIENT'),
+            'unread': int(box.get('unread', 0) or 0),
+            'lastMessageAt': box.get('lastMessageAt'),
+            'lastMessageText': box.get('lastMessageText', ''),
+            'lastSender': box.get('lastSender'),
+        })
+    rows.sort(key=lambda r: ((r['lastMessageAt'] or ''), (r['peer'] or {}).get('name', '').lower()), reverse=True)
+    return parse_decimals({'threads': rows})
+
+
+def latest_message(client_pk: str) -> Optional[dict]:
+    resp = table.query(KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with('MSG#'),
+                       ScanIndexForward=False, Limit=1)
+    items = resp.get('Items', [])
+    return items[0] if items else None
+
+
+def mark_thread_read(role: str, client_pk: str, ts: str) -> None:
+    """Reset the reader's unread counter and move their read-marker (drives the 'Seen' tick)."""
+    if role == 'CLIENT':
+        table.update_item(Key={'PK': client_pk, 'SK': THREAD_META_SK},
+                          UpdateExpression="SET clientUnread = :z, lastClientReadAt = :t",
+                          ExpressionAttributeValues={':z': 0, ':t': ts})
+    else:
+        table.update_item(Key={'PK': client_pk, 'SK': THREAD_META_SK},
+                          UpdateExpression="SET lastCoachReadAt = :t",
+                          ExpressionAttributeValues={':t': ts})
+
+
+@app.get("/messages/{clientId}")
+def get_messages(clientId: str, after: Optional[str] = None, before: Optional[str] = None,
+                 limit: int = 60, markRead: bool = True,
+                 user: dict = Depends(require_roles('CLIENT', 'COACH'))):
+    """Messages of one conversation, oldest first.
+    default: the latest `limit`;  after=<createdAt>: only newer ones (used for polling);  before=<createdAt>: older page."""
+    client_pk, client, coach_pk = thread_access(user, clientId)
+    limit = max(1, min(int(limit), 100))
+    has_more = False
+    if after:
+        if not parse_iso(after):
+            raise HTTPException(status_code=400, detail="Invalid 'after' value.")
+        items = table.query(KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').between(f"MSG#{after}", "MSG#~"),
+                            Limit=200).get('Items', [])
+    else:
+        if before:
+            if not parse_iso(before):
+                raise HTTPException(status_code=400, detail="Invalid 'before' value.")
+            cond = Key('PK').eq(client_pk) & Key('SK').between("MSG#", f"MSG#{before}")
+        else:
+            cond = Key('PK').eq(client_pk) & Key('SK').begins_with('MSG#')
+        items = table.query(KeyConditionExpression=cond, ScanIndexForward=False, Limit=limit + 1).get('Items', [])
+        has_more = len(items) > limit
+        items = list(reversed(items[:limit]))
+
+    meta = table.get_item(Key={'PK': client_pk, 'SK': THREAD_META_SK}).get('Item') or {}
+    viewer = user['role']
+    if markRead:
+        try:
+            if viewer == 'CLIENT':
+                if int(meta.get('clientUnread', 0) or 0) > 0:
+                    mark_thread_read('CLIENT', client_pk, now_iso())
+            else:
+                box = table.get_item(Key={'PK': user['pk'], 'SK': inbox_sk(client_pk)}).get('Item') or {}
+                if int(box.get('unread', 0) or 0) > 0:
+                    table.update_item(Key={'PK': user['pk'], 'SK': inbox_sk(client_pk)},
+                                      UpdateExpression="SET unread = :z", ExpressionAttributeValues={':z': 0})
+                    mark_thread_read('COACH', client_pk, now_iso())
+        except Exception:
+            logger.warning('could not mark thread read for %s', user['pk'])
+
+    if viewer == 'CLIENT':
+        peer = peer_summary(get_profile(coach_pk) if coach_pk else None, 'COACH')
+        peer_read = meta.get('lastCoachReadAt')
+    else:
+        peer = peer_summary(client, 'CLIENT')
+        peer_read = meta.get('lastClientReadAt')
+    return parse_decimals({
+        'messages': [message_out(i, viewer) for i in items],
+        'peer': peer,
+        'peerLastReadAt': peer_read,
+        'hasMore': has_more,
+        'canSend': bool(coach_pk),
+        'serverTime': now_iso(),
+    })
+
+
+@app.post("/messages/{clientId}")
+def send_message(clientId: str, payload: MessagePayload, user: dict = Depends(require_roles('CLIENT', 'COACH'))):
+    client_pk, client, coach_pk = thread_access(user, clientId)
+    if not coach_pk:
+        raise HTTPException(status_code=409, detail="You do not have a coach assigned yet.")
+    text = (payload.text or '').strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Message cannot be empty.")
+    if len(text) > MESSAGE_MAX_LENGTH:
+        raise HTTPException(status_code=400, detail=f"Message is too long (max {MESSAGE_MAX_LENGTH} characters).")
+
+    ts = now_iso()
+    sender = user['role']
+    item = to_dynamo({
+        'PK': client_pk,
+        'SK': f"MSG#{ts}#{uuid.uuid4().hex[:6]}",
+        'type': 'MESSAGE',
+        'sender': sender,
+        'senderPk': user['pk'],
+        'senderName': user.get('name') or '',
+        'coachId': coach_pk,
+        'text': text,
+        'clientMsgId': clean_text(payload.clientMsgId, 64) or None,
+        'createdAt': ts,
+    })
+    table.put_item(Item=item)
+
+    preview = text[:140]
+    box_key = {'PK': coach_pk, 'SK': inbox_sk(client_pk)}
+    box_values = {':c': short_id(client_pk), ':n': client.get('name') or '', ':t': ts, ':x': preview, ':s': sender}
+    if sender == 'CLIENT':
+        table.update_item(Key={'PK': client_pk, 'SK': THREAD_META_SK},
+                          UpdateExpression="SET lastMessageAt = :t, lastClientReadAt = :t, clientUnread = :z",
+                          ExpressionAttributeValues={':t': ts, ':z': 0})
+        table.update_item(Key=box_key,
+                          UpdateExpression="SET clientId = :c, clientName = :n, lastMessageAt = :t, lastMessageText = :x, lastSender = :s ADD unread :one",
+                          ExpressionAttributeValues={**box_values, ':one': 1})
+    else:
+        table.update_item(Key={'PK': client_pk, 'SK': THREAD_META_SK},
+                          UpdateExpression="SET lastMessageAt = :t, lastCoachReadAt = :t ADD clientUnread :one",
+                          ExpressionAttributeValues={':t': ts, ':one': 1})
+        table.update_item(Key=box_key,
+                          UpdateExpression="SET clientId = :c, clientName = :n, lastMessageAt = :t, lastMessageText = :x, lastSender = :s, unread = :z",
+                          ExpressionAttributeValues={**box_values, ':z': 0})
+    return {'message': message_out(item, sender)}
+
+
+@app.post("/messages/{clientId}/read")
+def mark_messages_read(clientId: str, user: dict = Depends(require_roles('CLIENT', 'COACH'))):
+    client_pk, _client, _coach_pk = thread_access(user, clientId)
+    ts = now_iso()
+    if user['role'] == 'COACH':
+        table.update_item(Key={'PK': user['pk'], 'SK': inbox_sk(client_pk)},
+                          UpdateExpression="SET unread = :z", ExpressionAttributeValues={':z': 0})
+    mark_thread_read(user['role'], client_pk, ts)
+    return {'message': 'Marked as read'}
+
 
 # -------------------------- client check status ----------------------------
 @app.get("/athlete/{athleteId}/check-status")
@@ -1856,8 +2188,14 @@ def get_coach_client_check_status(coachId: str, clientId: str, user: dict = Depe
 
 # ------------------------------- athlete -----------------------------------
 def schedule_days(spec: str) -> Optional[set]:
-    """'Mon / Wed / Fri' -> {0, 2, 4}. Empty or unreadable -> None (no fixed weekdays)."""
-    found = {WEEKDAYS.index(w) for w in (t.strip().lower()[:3] for t in re.split(r'[^A-Za-z]+', spec or '')) if w in WEEKDAYS}
+    """'Mon / Wed / Fri' -> {0, 2, 4};  'Mon-Fri' -> {0..4}.  Empty or unreadable -> None (no fixed weekdays)."""
+    text = (spec or '').lower()
+    found = set()
+    for a, b in re.findall(r'\b([a-z]{3})[a-z]*\s*(?:-|–|—|to)\s*([a-z]{3})[a-z]*\b', text):
+        if a in WEEKDAYS and b in WEEKDAYS:
+            i, j = WEEKDAYS.index(a), WEEKDAYS.index(b)
+            found.update(range(i, j + 1) if i <= j else list(range(i, 7)) + list(range(0, j + 1)))
+    found.update(WEEKDAYS.index(w) for w in (t.strip()[:3] for t in re.split(r'[^a-z]+', text)) if w in WEEKDAYS)
     return found or None
 
 
@@ -1865,9 +2203,11 @@ def workout_summary(schedules: List[dict], logs: Dict[str, dict], day: str) -> d
     """Today's sessions from the assigned plans, plus the last-7-days completion numbers."""
     today = datetime.strptime(day, '%Y-%m-%d').date()
     today_rows, planned, done = [], 0, 0
+    week: Dict[str, Dict[str, int]] = {}
     for offset in range(7):
         d = today - timedelta(days=offset)
         d_iso = d.isoformat()
+        week[d_iso] = {'planned': 0, 'done': 0}
         for sched in schedules:
             if (sched.get('startDate') or '0000-00-00') > d_iso:
                 continue
@@ -1877,6 +2217,8 @@ def workout_summary(schedules: List[dict], logs: Dict[str, dict], day: str) -> d
             logged = f"WORKOUTLOG#{d_iso}#{sched['assignmentId']}" in logs
             planned += 1
             done += 1 if logged else 0
+            week[d_iso]['planned'] += 1
+            week[d_iso]['done'] += 1 if logged else 0
             if offset == 0:
                 count = len(sched.get('exercises') or [])
                 bits = [f"{count} exercises" if count else None, sched.get('estimatedDuration') or None]
@@ -1888,7 +2230,9 @@ def workout_summary(schedules: List[dict], logs: Dict[str, dict], day: str) -> d
                     "statusText": 'completed' if logged else 'pending',
                     "statusColor": 'green' if logged else 'gold',
                 })
-    return {"today": today_rows, "done": done, "completion": round(100 * done / planned) if planned else None}
+    return {"today": today_rows, "done": done, "planned": planned,
+            "completion": round(100 * done / planned) if planned else None,
+            "week": [{"date": d, **week[d]} for d in sorted(week)]}
 
 
 @app.put("/athlete/workouts/log")
@@ -1919,7 +2263,7 @@ def get_athlete_dashboard(athleteId: str, date: Optional[str] = None, user: dict
     'today' a user in India sees is not shifted by the server running in UTC."""
     client_pk = make_pk('CLIENT', athleteId)
     authorize_athlete_scope(user, client_pk)
-    day = date if date and re.match(r'^\d{4}-\d{2}-\d{2}$', date) else datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    day = date if date and re.match(r'^\d{4}-\d{2}-\d{2}$', date) else utc_today()
     items = query_all(
         KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with(f"TRAINING#{day}")
     )
@@ -1950,20 +2294,38 @@ def get_athlete_dashboard(athleteId: str, date: Optional[str] = None, user: dict
         for i in items
     ] + workout['today']
 
+    # Last 7 days (ending on the athlete's own "today") for the weekly-rhythm bars
+    days = date_window(day, 7)
+    week_health = health_range(client_pk, days[0], day)
+    by_date = {w['date']: w for w in workout['week']}
+    weekly = []
+    for d in days:
+        w = by_date.get(d, {'planned': 0, 'done': 0})
+        weekly.append({
+            "date": d,
+            "workoutPct": round(100 * w['done'] / w['planned']) if w['planned'] else None,
+            "stepsPct": pct_of(week_health.get(d, {}).get('steps'), STEP_GOAL),
+        })
+
     out = {
         "date": day,
         "todayTraining": today_training,
         "assignedSchedules": [_schedule_out(i) for i in schedules],
         "steps": health.get('steps'),
-        "stepGoal": 10000,
+        "stepGoal": STEP_GOAL,
         "sleepHours": health.get('sleepHours'),
-        "sleepGoal": 8,
+        "sleepGoal": SLEEP_GOAL,
         "calories": health.get('calories'),
         "hydration": health.get('hydration'),
-        "hydrationGoal": 3.0,
+        "hydrationGoal": HYDRATION_GOAL,
         "heartRate": health.get('heartRate'),
+        "healthSource": health.get('source'),
+        "healthUpdatedAt": health.get('updatedAt'),
         "workoutsThisWeek": workout['done'],
+        "weekly": weekly,
     }
+    if health.get('sleepHours') is not None:
+        out["recovery"] = pct_of(health.get('sleepHours'), SLEEP_GOAL)      # readiness = how much of the sleep target was met
     if workout['completion'] is not None:
         out["workoutCompletion"] = workout['completion']
     return parse_decimals(out)
@@ -2116,10 +2478,65 @@ def get_client_progress(coachId: str, clientId: str, user: dict = Depends(requir
         })
     weights = [h['weight'] for h in history if h['weight'] is not None]
     scores = [h['adherenceScore'] for h in history if h['adherenceScore'] is not None]
+
+    # ---- daily activity: steps / sleep / water / calories / heart-rate, last 14 days ----
+    today = utc_today()
+    days = date_window(today, 14)
+    window_end = (datetime.strptime(today, '%Y-%m-%d').date() + timedelta(days=1)).isoformat()
+    snapshots = health_range(client_pk, days[0], window_end)
+    health = [{'date': d, **health_view(snapshots.get(d)), 'source': snapshots.get(d, {}).get('source')}
+              for d in sorted(set(days) | set(snapshots))][-14:]
+    recent = health[-7:]
+
+    def mean(key: str) -> Optional[float]:
+        vals = [float(h[key]) for h in recent if h.get(key) is not None]
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    latest_day = max((h['date'] for h in health if h.get('steps') is not None), default=None)
+    latest_snap = snapshots.get(latest_day, {}) if latest_day else {}
+    avg_steps = mean('steps')
+
+    schedules = [i for i in query_all(KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with('SCHEDULE#'))
+                 if i.get('status', 'ACTIVE') == 'ACTIVE']
+    logs = {i['SK']: i for i in query_all(KeyConditionExpression=Key('PK').eq(client_pk) & Key('SK').begins_with('WORKOUTLOG#'))}
+    wk = workout_summary(schedules, logs, today)
+    pres = profile_presence(client)
+
     return parse_decimals({
         'client': {'id': short_id(client_pk), 'name': client.get('name') or 'Unnamed Athlete',
                    'goal': client.get('primaryGoal') or client.get('goal') or 'Not set'},
+        'profile': {
+            'email': client.get('email', ''),
+            'age': client.get('age'),
+            'height': client.get('height'),
+            'startWeight': client.get('weight'),
+            'activityLevel': client.get('activityLevel'),
+            'primaryGoal': client.get('primaryGoal') or client.get('goal'),
+            'medicalNotes': client.get('medicalNotes') or '',
+            'memberSince': client.get('createdAt'),
+            'onboardingCompleted': bool(client.get('onboardingCompleted', False)),
+            **pres,
+        },
         'checkins': history,
+        'health': health,
+        'activity': {
+            'stepsLatest': latest_snap.get('steps'),
+            'stepsLatestDate': latest_day,
+            'stepsAvg7d': round(avg_steps) if avg_steps is not None else None,
+            'stepGoal': STEP_GOAL,
+            'sleepAvg7d': mean('sleepHours'),
+            'sleepGoal': SLEEP_GOAL,
+            'hydrationAvg7d': mean('hydration'),
+            'hydrationGoal': HYDRATION_GOAL,
+            'caloriesAvg7d': round(mean('calories')) if mean('calories') is not None else None,
+            'heartRateAvg7d': round(mean('heartRate')) if mean('heartRate') is not None else None,
+            'daysWithData': sum(1 for h in recent if h.get('steps') is not None),
+            'workoutsDone7d': wk['done'],
+            'workoutsPlanned7d': wk['planned'],
+            'workoutCompletion7d': wk['completion'],
+            'lastSyncAt': latest_snap.get('updatedAt'),
+            'source': latest_snap.get('source'),
+        },
         'summary': {
             'weightChange': round(float(weights[-1]) - float(weights[0]), 1) if len(weights) > 1 else None,
             'averageAdherence': round(sum(scores) / len(scores), 1) if scores else None,
@@ -2130,22 +2547,38 @@ def get_client_progress(coachId: str, clientId: str, user: dict = Depends(requir
 
 @app.put("/athlete/health-metrics")
 def save_health_metrics(payload: HealthMetricsPayload, user: dict = Depends(require_roles('CLIENT'))):
-    """Receive today's device sensor data (steps, sleep, calories, HR) from the phone.
-    Values are stored on the daily profile snapshot so the athlete dashboard can
-    display them without the frontend calling the phone SDK on every render."""
+    """Store one day's steps / sleep / water / calories / heart-rate for the signed-in athlete.
+    Values come either from the phone's health sensors or are typed in by the athlete (iPhone home-screen
+    apps cannot read Apple Health). The coach sees the same numbers."""
     client_pk = user['pk']
-    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
-    sk = f"HEALTH#{today}"
+    today = utc_today()
+    day = today
+    if payload.date:
+        if not re.match(r'^\d{4}-\d{2}-\d{2}$', payload.date):
+            raise HTTPException(status_code=400, detail="Invalid date.")
+        try:
+            gap = abs((datetime.strptime(payload.date, '%Y-%m-%d').date() - datetime.strptime(today, '%Y-%m-%d').date()).days)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date.")
+        if gap > 1:          # the phone's "today" can differ from UTC by at most a day
+            raise HTTPException(status_code=400, detail="Health data can only be saved for today.")
+        day = payload.date
+
+    check_range('Steps', payload.steps, 0, 200000)
+    check_range('Sleep (hours)', payload.sleepHours, 0, 24)
+    check_range('Calories', payload.calories, 0, 20000)
+    check_range('Heart rate', payload.heartRate, 20, 250)
+    check_range('Water (litres)', payload.hydration, 0, 15)
 
     update_map: Dict[str, Any] = {}
     if payload.steps is not None:
-        update_map['steps'] = payload.steps
+        update_map['steps'] = int(payload.steps)
     if payload.sleepHours is not None:
         update_map['sleepHours'] = Decimal(str(round(payload.sleepHours, 2)))
     if payload.calories is not None:
-        update_map['calories'] = payload.calories
+        update_map['calories'] = int(payload.calories)
     if payload.heartRate is not None:
-        update_map['heartRate'] = payload.heartRate
+        update_map['heartRate'] = int(payload.heartRate)
     if payload.hydration is not None:
         update_map['hydration'] = Decimal(str(round(payload.hydration, 2)))
 
@@ -2154,51 +2587,44 @@ def save_health_metrics(payload: HealthMetricsPayload, user: dict = Depends(requ
 
     update_map['updatedAt'] = now_iso()
     update_map['type'] = 'HEALTH_SNAPSHOT'
+    update_map['source'] = 'manual' if payload.source == 'manual' else 'device'
 
-    # Build a safe UpdateExpression from the non-None fields
     set_parts = [f"#{k} = :{k}" for k in update_map]
     expr_names = {f"#{k}": k for k in update_map}
     expr_values = {f":{k}": to_dynamo(v) for k, v in update_map.items()}
 
     table.update_item(
-        Key={'PK': client_pk, 'SK': sk},
+        Key={'PK': client_pk, 'SK': f"HEALTH#{day}"},
         UpdateExpression="SET " + ", ".join(set_parts),
         ExpressionAttributeNames=expr_names,
         ExpressionAttributeValues=expr_values,
     )
-    return {"message": "Health metrics saved", "date": today}
+    return {"message": "Health metrics saved", "date": day}
 
 
 @app.get("/athlete/{athleteId}/health-metrics")
 def get_health_metrics(athleteId: str, date: Optional[str] = None, user: dict = Depends(current_user)):
-    """Return the stored health snapshot for today (or a given date).
+    """Return the stored health snapshot for a day (default: today).
     Athletes see only their own data; coaches see only their assigned clients."""
     client_pk = make_pk('CLIENT', athleteId)
     if user.get('role') == 'CLIENT':
         authorize_athlete_scope(user, client_pk)
     elif user.get('role') == 'COACH':
-        # Coach may only view assigned clients
-        profile = get_profile(client_pk)
-        if not profile or profile.get('coachId') != user['pk']:
+        if not is_coach_of(get_profile(client_pk), user['pk']):
             raise HTTPException(status_code=403, detail="Not your client.")
     else:
         raise HTTPException(status_code=403, detail="Forbidden.")
 
-    day = date if date and re.match(r'^\d{4}-\d{2}-\d{2}$', date) else datetime.now(timezone.utc).strftime('%Y-%m-%d')
-    item = get_profile.__wrapped__(client_pk) if hasattr(get_profile, '__wrapped__') else None
+    day = date if date and re.match(r'^\d{4}-\d{2}-\d{2}$', date) else utc_today()
     try:
-        result = table.get_item(Key={'PK': client_pk, 'SK': f"HEALTH#{day}"})
-        snapshot = result.get('Item') or {}
+        snapshot = table.get_item(Key={'PK': client_pk, 'SK': f"HEALTH#{day}"}).get('Item') or {}
     except Exception:
         snapshot = {}
     return parse_decimals({
         "date": day,
-        "steps": snapshot.get('steps'),
-        "sleepHours": snapshot.get('sleepHours'),
-        "calories": snapshot.get('calories'),
-        "heartRate": snapshot.get('heartRate'),
-        "hydration": snapshot.get('hydration'),
+        **health_view(snapshot),
         "updatedAt": snapshot.get('updatedAt'),
+        "source": snapshot.get('source'),
     })
 
 

@@ -60,7 +60,7 @@ export default function AssignTemplateModal({ templateId, templateTitle, onClose
     position: "fixed",
     inset: 0,
     zIndex: 1000,
-    background: "rgba(0,0,0,0.75)",
+    background: "rgb(var(--well-rgb) / 0.75)",
     backdropFilter: "blur(6px)",
     display: "flex",
     alignItems: "center",
@@ -69,8 +69,8 @@ export default function AssignTemplateModal({ templateId, templateTitle, onClose
   };
 
   const modalStyle: React.CSSProperties = {
-    background: "rgba(20,20,28,0.98)",
-    border: "1px solid rgba(255,255,255,0.1)",
+    background: "rgb(var(--well-rgb) / 0.98)",
+    border: "1px solid rgb(var(--ink-rgb) / 0.1)",
     borderRadius: "20px",
     width: "100%",
     maxWidth: "520px",
@@ -88,10 +88,10 @@ export default function AssignTemplateModal({ templateId, templateTitle, onClose
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>
+            <h2 style={{ fontSize: "20px", fontWeight: 700, color: "var(--text-primary)", margin: "0 0 4px" }}>
               Assign Template
             </h2>
-            <p style={{ fontSize: "13px", color: "#E5B869", margin: 0 }}>"{templateTitle}"</p>
+            <p style={{ fontSize: "13px", color: "var(--accent-gold)", margin: 0 }}>"{templateTitle}"</p>
           </div>
           <button
             onClick={onClose}
@@ -103,8 +103,8 @@ export default function AssignTemplateModal({ templateId, templateTitle, onClose
 
         {done ? (
           <div style={{ textAlign: "center", padding: "24px" }}>
-            <CheckCircle2 size={40} color="#00E27B" style={{ marginBottom: "14px" }} />
-            <p style={{ fontSize: "18px", fontWeight: 700, color: "#00E27B", margin: "0 0 8px" }}>
+            <CheckCircle2 size={40} color="var(--accent-green)" style={{ marginBottom: "14px" }} />
+            <p style={{ fontSize: "18px", fontWeight: 700, color: "var(--accent-green)", margin: "0 0 8px" }}>
               Assigned Successfully!
             </p>
             <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "0 0 24px" }}>
@@ -113,10 +113,10 @@ export default function AssignTemplateModal({ templateId, templateTitle, onClose
             <button
               onClick={onClose}
               style={{
-                background: "rgba(0,226,123,0.15)",
-                border: "1px solid rgba(0,226,123,0.4)",
+                background: "rgb(var(--green-rgb) / 0.15)",
+                border: "1px solid rgb(var(--green-rgb) / 0.4)",
                 borderRadius: "12px",
-                color: "#00E27B",
+                color: "var(--accent-green)",
                 padding: "12px 28px",
                 cursor: "pointer",
                 fontWeight: 700,
@@ -142,10 +142,10 @@ export default function AssignTemplateModal({ templateId, templateTitle, onClose
                   style={{
                     width: "100%",
                     padding: "10px 10px 10px 36px",
-                    background: "rgba(0,0,0,0.4)",
-                    border: "1px solid rgba(255,255,255,0.12)",
+                    background: "rgb(var(--well-rgb) / 0.4)",
+                    border: "1px solid rgb(var(--ink-rgb) / 0.12)",
                     borderRadius: "10px",
-                    color: "#fff",
+                    color: "var(--text-primary)",
                     outline: "none",
                     fontSize: "13px",
                     boxSizing: "border-box",
@@ -168,23 +168,23 @@ export default function AssignTemplateModal({ templateId, templateTitle, onClose
                         borderRadius: "10px",
                         cursor: "pointer",
                         border: selected?.id === c.id
-                          ? "1px solid rgba(0,226,123,0.5)"
-                          : "1px solid rgba(255,255,255,0.07)",
+                          ? "1px solid rgb(var(--green-rgb) / 0.5)"
+                          : "1px solid rgb(var(--ink-rgb) / 0.07)",
                         background: selected?.id === c.id
-                          ? "rgba(0,226,123,0.08)"
-                          : "rgba(255,255,255,0.03)",
+                          ? "rgb(var(--green-rgb) / 0.08)"
+                          : "rgb(var(--ink-rgb) / 0.03)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
                       }}
                     >
                       <div>
-                        <p style={{ fontSize: "14px", fontWeight: 600, color: "#fff", margin: "0 0 2px" }}>{c.name}</p>
+                        <p style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", margin: "0 0 2px" }}>{c.name}</p>
                         <p style={{ fontSize: "11px", color: "var(--text-secondary)", margin: 0 }}>
                           ID: {c.id} · {c.goal}
                         </p>
                       </div>
-                      {selected?.id === c.id && <CheckCircle2 size={18} color="#00E27B" />}
+                      {selected?.id === c.id && <CheckCircle2 size={18} color="var(--accent-green)" />}
                     </div>
                   ))}
                   {filtered.length === 0 && (
@@ -210,10 +210,10 @@ export default function AssignTemplateModal({ templateId, templateTitle, onClose
                     style={{
                       width: "100%",
                       padding: "10px 12px",
-                      background: "rgba(0,0,0,0.4)",
-                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: "rgb(var(--well-rgb) / 0.4)",
+                      border: "1px solid rgb(var(--ink-rgb) / 0.12)",
                       borderRadius: "10px",
-                      color: "#fff",
+                      color: "var(--text-primary)",
                       outline: "none",
                       fontSize: "13px",
                       boxSizing: "border-box",
@@ -233,10 +233,10 @@ export default function AssignTemplateModal({ templateId, templateTitle, onClose
                     style={{
                       width: "100%",
                       padding: "10px 12px",
-                      background: "rgba(0,0,0,0.4)",
-                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: "rgb(var(--well-rgb) / 0.4)",
+                      border: "1px solid rgb(var(--ink-rgb) / 0.12)",
                       borderRadius: "10px",
-                      color: "#fff",
+                      color: "var(--text-primary)",
                       outline: "none",
                       fontSize: "13px",
                       resize: "vertical",
@@ -248,7 +248,7 @@ export default function AssignTemplateModal({ templateId, templateTitle, onClose
             )}
 
             {error && (
-              <p style={{ color: "#FF453A", fontSize: "13px", margin: 0 }}>{error}</p>
+              <p style={{ color: "var(--danger)", fontSize: "13px", margin: 0 }}>{error}</p>
             )}
 
             {/* Actions */}
@@ -259,7 +259,7 @@ export default function AssignTemplateModal({ templateId, templateTitle, onClose
                   flex: 1,
                   padding: "14px",
                   background: "transparent",
-                  border: "1px solid rgba(255,255,255,0.15)",
+                  border: "1px solid rgb(var(--ink-rgb) / 0.15)",
                   borderRadius: "12px",
                   color: "var(--text-secondary)",
                   cursor: "pointer",
@@ -274,10 +274,10 @@ export default function AssignTemplateModal({ templateId, templateTitle, onClose
                 style={{
                   flex: 2,
                   padding: "14px",
-                  background: selected ? "rgba(0,122,255,0.15)" : "rgba(255,255,255,0.05)",
-                  border: selected ? "1px solid rgba(0,122,255,0.4)" : "1px solid rgba(255,255,255,0.1)",
+                  background: selected ? "rgb(var(--blue-rgb) / 0.15)" : "rgb(var(--ink-rgb) / 0.05)",
+                  border: selected ? "1px solid rgb(var(--blue-rgb) / 0.4)" : "1px solid rgb(var(--ink-rgb) / 0.1)",
                   borderRadius: "12px",
-                  color: selected ? "#60A5FA" : "var(--text-secondary)",
+                  color: selected ? "var(--blue)" : "var(--text-secondary)",
                   cursor: selected ? "pointer" : "not-allowed",
                   fontSize: "13px",
                   fontWeight: 700,

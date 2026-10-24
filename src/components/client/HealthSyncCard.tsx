@@ -209,7 +209,7 @@ export default function HealthSyncCard({
 
   if (state === "unavailable") {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", color: "var(--text-secondary)", fontSize: "13px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px", background: "rgb(var(--ink-rgb) / 0.03)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", color: "var(--text-secondary)", fontSize: "13px" }}>
         <Smartphone size={16} />
         <span>Health data is available in the native Android/iPhone app. Open the app on your phone to sync.</span>
       </div>
@@ -217,12 +217,12 @@ export default function HealthSyncCard({
   }
 
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", flexWrap: "wrap" }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", padding: "12px 16px", background: "rgb(var(--ink-rgb) / 0.03)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", flexWrap: "wrap" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
         {state === "done" ? (
           <CheckCircle2 size={16} color="var(--accent-green)" />
         ) : state === "error" ? (
-          <AlertCircle size={16} color="#f87171" />
+          <AlertCircle size={16} color="var(--danger)" />
         ) : (
           <Activity size={16} color="var(--accent-gold)" style={{ animation: state === "syncing" ? "pulse 1s infinite" : "none" }} />
         )}
@@ -253,7 +253,7 @@ export default function HealthSyncCard({
         type="button"
         onClick={trySync}
         disabled={state === "syncing"}
-        style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", background: "rgba(255,255,255,0.06)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-sm)", color: "var(--text-primary)", fontSize: "12px", cursor: state === "syncing" ? "wait" : "pointer", transition: "border-color 0.2s" }}
+        style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", background: "rgb(var(--ink-rgb) / 0.06)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-sm)", color: "var(--text-primary)", fontSize: "12px", cursor: state === "syncing" ? "wait" : "pointer", transition: "border-color 0.2s" }}
       >
         <RefreshCw size={13} style={{ animation: state === "syncing" ? "spin 1s linear infinite" : "none" }} />
         {state === "syncing" ? "Syncing…" : "Sync now"}

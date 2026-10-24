@@ -13,11 +13,11 @@ export default function ScheduleViewLayout({ children }: { children: React.React
         <style>{`
           *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
           :root {
-            --accent-gold: #E5B869; --accent-green: #00E27B;
+            --accent-gold: var(--accent-gold); --accent-green: var(--accent-green);
             --text-primary: #FFFFFF; --text-secondary: #888888;
-            --bg-app: #050505;
+            --bg-app: var(--s1);
           }
-          body { background: #050505; color: #fff; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif; -webkit-font-smoothing: antialiased; }
+          body { background: var(--bg-elev); color: var(--text-primary); font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif; -webkit-font-smoothing: antialiased; }
           @keyframes spin { to { transform: rotate(360deg); } }
           .animate-spin { animation: spin 1s linear infinite; }
         `}</style>

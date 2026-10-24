@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { mix } from "@/lib/format";
 
 interface ProgressRingProps {
   value?: number;
@@ -91,7 +92,7 @@ export default function ProgressRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="rgba(255,255,255,0.055)"
+          stroke="rgb(var(--ink-rgb) / 0.055)"
           strokeWidth={strokeWidth}
         />
 
@@ -110,7 +111,7 @@ export default function ProgressRing({
               transition: "stroke-dashoffset 80ms linear",
               filter:
                 glow > 0
-                  ? `drop-shadow(0 0 ${glow}px ${accent}55)`
+                  ? `drop-shadow(0 0 ${glow}px ${mix(accent, "55")})`
                   : "none",
             }}
           />

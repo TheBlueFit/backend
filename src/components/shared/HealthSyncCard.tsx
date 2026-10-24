@@ -181,14 +181,14 @@ export default function HealthSyncCard({ onSync }: { onSync?: (data: HealthReadi
 
   if (state === "needs-permission" || (permissions.health === "prompt" && state === "idle")) {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", background: "rgba(229,184,105,0.06)", border: "1px solid rgba(229,184,105,0.25)", borderRadius: "var(--radius-md)" }}>
-        <Heart size={18} color="#E5B869" />
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", background: "rgb(var(--gold-rgb) / 0.06)", border: "1px solid rgb(var(--gold-rgb) / 0.25)", borderRadius: "var(--radius-md)" }}>
+        <Heart size={18} color="var(--accent-gold)" />
         <div style={{ flex: 1 }}>
-          <p style={{ fontSize: 13, fontWeight: 600, color: "#fff", margin: "0 0 2px" }}>Health sync needs permission</p>
+          <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 2px" }}>Health sync needs permission</p>
           <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: 0 }}>Allow Health access to sync steps, sleep and heart-rate.</p>
         </div>
         <button type="button" onClick={async () => { await requestPermission("health"); trySync(range); }}
-          style={{ padding: "8px 14px", background: "rgba(229,184,105,0.15)", border: "1px solid rgba(229,184,105,0.4)", borderRadius: 8, color: "#E5B869", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+          style={{ padding: "8px 14px", background: "rgb(var(--gold-rgb) / 0.15)", border: "1px solid rgb(var(--gold-rgb) / 0.4)", borderRadius: 8, color: "var(--accent-gold)", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
           Allow
         </button>
       </div>
@@ -197,7 +197,7 @@ export default function HealthSyncCard({ onSync }: { onSync?: (data: HealthReadi
 
   if (state === "ios-deferred") {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", color: "var(--text-secondary)", fontSize: 13 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "rgb(var(--ink-rgb) / 0.03)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", color: "var(--text-secondary)", fontSize: 13 }}>
         <Apple size={16} /><span>Apple Health sync is coming soon. Check back in a future update.</span>
       </div>
     );
@@ -205,17 +205,17 @@ export default function HealthSyncCard({ onSync }: { onSync?: (data: HealthReadi
 
   if (state === "unavailable") {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", color: "var(--text-secondary)", fontSize: 13 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "rgb(var(--ink-rgb) / 0.03)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", color: "var(--text-secondary)", fontSize: 13 }}>
         <Smartphone size={16} /><span>Health data sync is available on Android. Open the app on your phone to sync.</span>
       </div>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 16px", background: "rgb(var(--ink-rgb) / 0.03)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }}>
       {/* Fix 5: Range toggle row */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-        <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.05)", borderRadius: 8, padding: 3 }}>
+        <div style={{ display: "flex", gap: 4, background: "rgb(var(--ink-rgb) / 0.05)", borderRadius: 8, padding: 3 }}>
           {(Object.keys(RANGE_LABELS) as TimeRange[]).map(r => (
             <button
               key={r}
@@ -224,8 +224,8 @@ export default function HealthSyncCard({ onSync }: { onSync?: (data: HealthReadi
               style={{
                 padding: "4px 10px", borderRadius: 6, border: "none", fontSize: 11,
                 fontWeight: range === r ? 700 : 400, cursor: "pointer",
-                background: range === r ? "rgba(229,184,105,0.18)" : "transparent",
-                color: range === r ? "#E5B869" : "var(--text-secondary)",
+                background: range === r ? "rgb(var(--gold-rgb) / 0.18)" : "transparent",
+                color: range === r ? "var(--accent-gold)" : "var(--text-secondary)",
                 transition: "all 0.15s",
               }}
             >
@@ -239,7 +239,7 @@ export default function HealthSyncCard({ onSync }: { onSync?: (data: HealthReadi
           type="button"
           onClick={() => trySync(range)}
           disabled={state === "syncing"}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "rgba(255,255,255,0.06)", border: "1px solid var(--border-subtle)", borderRadius: 8, color: "var(--text-primary)", fontSize: 12, cursor: state === "syncing" ? "wait" : "pointer" }}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "rgb(var(--ink-rgb) / 0.06)", border: "1px solid var(--border-subtle)", borderRadius: 8, color: "var(--text-primary)", fontSize: 12, cursor: state === "syncing" ? "wait" : "pointer" }}
         >
           <RefreshCw size={13} style={{ animation: state === "syncing" ? "spin 1s linear infinite" : "none" }} />
           {state === "syncing" ? "Syncing…" : "Sync now"}
@@ -249,7 +249,7 @@ export default function HealthSyncCard({ onSync }: { onSync?: (data: HealthReadi
       {/* Reading row */}
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {state === "done"  && <CheckCircle2 size={15} color="var(--accent-green)" style={{ flexShrink: 0 }} />}
-        {state === "error" && <AlertCircle  size={15} color="#f87171"             style={{ flexShrink: 0 }} />}
+        {state === "error" && <AlertCircle  size={15} color="var(--danger)"             style={{ flexShrink: 0 }} />}
         {(state === "idle" || state === "syncing") && <Activity size={15} color="var(--accent-gold)" style={{ flexShrink: 0 }} />}
 
         <div>

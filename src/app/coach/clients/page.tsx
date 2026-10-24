@@ -1,7 +1,9 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Search, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Search, CheckCircle2, AlertCircle, Footprints, MessageSquare } from 'lucide-react';
+import { PresenceBadge } from '@/components/shared/Presence';
+import { fmtNum } from '@/lib/format';
 import { GlassCard } from '@/components/GlassCard';
 import { dashboardAPI, CoachClient } from '@/services/api';
 
@@ -22,6 +24,8 @@ export default function CoachClientRoster() {
       }
     };
     fetchClients();
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') fetchClients(); }, 30_000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const q = query.trim().toLowerCase();
@@ -72,19 +76,30 @@ export default function CoachClientRoster() {
         ) : (
           <div className="plan-cards-container">
             {visible.map((c) => (
-              <Link
-                key={c.id}
-                href={`/coach/clients/details?id=${c.id}`}
-                style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
-              >
-                <GlassCard
-                  title={c.name}
-                  subtitle={`${c.goal} • ${c.adherence}% adherence • Check-in: ${c.lastCheckIn}`}
-                  statusText={c.status === 'on-track' ? 'on track' : 'needs attention'}
-                  statusColor={c.status === 'on-track' ? 'green' : 'red'}
-                  Icon={c.status === 'on-track' ? CheckCircle2 : AlertCircle}
-                />
-              </Link>
+              <div key={c.id}>
+                <Link
+                  href={`/coach/clients/details?id=${c.id}`}
+                  style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
+                >
+                  <GlassCard
+                    title={c.name}
+                    subtitle={`${c.goal} • ${c.adherence}% adherence • Check-in: ${c.lastCheckIn}`}
+                    statusText={c.status === 'on-track' ? 'on track' : 'needs attention'}
+                    statusColor={c.status === 'on-track' ? 'green' : 'red'}
+                    Icon={c.status === 'on-track' ? CheckCircle2 : AlertCircle}
+                  />
+                </Link>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '8px 4px 0' }}>
+                  <PresenceBadge presence={c.presence} lastSeenAt={c.lastSeenAt} />
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-secondary)' }}>
+                    <Footprints size={13} /> {c.stepsToday != null ? `${fmtNum(c.stepsToday)} steps` : 'No steps yet'}
+                  </span>
+                  <Link href={`/coach/messages?client=${encodeURIComponent(c.id)}`} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--accent-gold)', textDecoration: 'none' }}>
+                    <MessageSquare size={14} /> Message
+                    {!!c.unreadMessages && <span className="msg-badge" style={{ margin: 0 }}>{c.unreadMessages}</span>}
+                  </Link>
+                </div>
+              </div>
             ))}
           </div>
         )}

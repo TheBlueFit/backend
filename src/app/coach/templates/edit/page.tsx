@@ -6,7 +6,7 @@ import TemplateClient from '../[id]/TemplateClient';
 // export. This route reads the ID from the URL query (?id=...) in the browser instead.
 export default function EditTemplatePage() {
   return (
-    <Suspense fallback={<div style={{ padding: '24px', color: 'white' }}>Loading configuration...</div>}>
+    <Suspense fallback={<div style={{ padding: '24px', color: 'var(--text-primary)' }}>Loading configuration...</div>}>
       <TemplateClient />
     </Suspense>
   );

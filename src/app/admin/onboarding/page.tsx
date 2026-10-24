@@ -31,7 +31,7 @@
 //   const inputStyle = {
 //     width: '100%',
 //     padding: '14px',
-//     background: 'rgba(0,0,0,0.4)',
+//     background: 'rgb(var(--well-rgb) / 0.4)',
 //     border: '1px solid var(--border-subtle)',
 //     borderRadius: 'var(--radius-sm)',
 //     color: 'var(--text-primary)',
@@ -92,8 +92,8 @@
 //     return (
 //       <div className="container" style={{ maxWidth: '600px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh' }}>
 //         <div className="app-card fade-in" style={{ textAlign: 'center', padding: '40px 20px', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)' }}>
-//           <div style={{ width: '80px', height: '80px', background: 'rgba(0, 226, 123, 0.1)', border: '1px solid var(--accent-green)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto', boxShadow: '0 0 15px rgba(0, 226, 123, 0.2)' }}>
-//             <CheckCircle2 className="neon-green" size={40} color="#00E27B" />
+//           <div style={{ width: '80px', height: '80px', background: 'rgb(var(--green-rgb) / 0.1)', border: '1px solid var(--accent-green)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto', boxShadow: '0 0 15px rgb(var(--green-rgb) / 0.2)' }}>
+//             <CheckCircle2 className="neon-green" size={40} color="var(--accent-green)" />
 //           </div>
 //           <h2 className="glazy-title" style={{ fontSize: '28px', marginBottom: '12px', textTransform: 'none' }}>
 //             {role === 'COACH' ? 'Coach Provisioned' : 'Client Profile Stored'}
@@ -147,7 +147,7 @@
 //               {/* Role Selection Dropdown */}
 //               <div style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '24px', backdropFilter: 'blur(10px)' }}>
 //                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontSize: '16px', marginBottom: '20px', fontWeight: '600' }}>
-//                   <Shield size={18} color="#60A5FA" /> Account Provisioning
+//                   <Shield size={18} color="var(--blue)" /> Account Provisioning
 //                 </h3>
 //                 <div>
 //                   <label className="label-text">Select Account Type</label>
@@ -160,8 +160,8 @@
 //                     required 
 //                     style={{...inputStyle, WebkitAppearance: 'none', backgroundImage: selectBg, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px top 50%', backgroundSize: '10px auto'}}
 //                   >
-//                     <option value="CLIENT" style={{ background: '#111' }}>Athlete / Client</option>
-//                     <option value="COACH" style={{ background: '#111' }}>Coach / Trainer</option>
+//                     <option value="CLIENT" style={{ background: 'var(--bg-elev)' }}>Athlete / Client</option>
+//                     <option value="COACH" style={{ background: 'var(--bg-elev)' }}>Coach / Trainer</option>
 //                   </select>
 //                 </div>
 //               </div>
@@ -202,10 +202,10 @@
 //                         onChange={(e) => setCoachSpecialization(e.target.value)}
 //                         style={{...inputStyle, WebkitAppearance: 'none', backgroundImage: selectBg, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px top 50%', backgroundSize: '10px auto'}}
 //                       >
-//                         <option value="hypertrophy" style={{ background: '#111' }}>Muscle Hypertrophy & Bodybuilding</option>
-//                         <option value="nutrition" style={{ background: '#111' }}>Clinical Nutrition & Fat Loss</option>
-//                         <option value="mobility" style={{ background: '#111' }}>Mobility & Injury Rehab</option>
-//                         <option value="powerlifting" style={{ background: '#111' }}>Strength & Powerlifting</option>
+//                         <option value="hypertrophy" style={{ background: 'var(--bg-elev)' }}>Muscle Hypertrophy & Bodybuilding</option>
+//                         <option value="nutrition" style={{ background: 'var(--bg-elev)' }}>Clinical Nutrition & Fat Loss</option>
+//                         <option value="mobility" style={{ background: 'var(--bg-elev)' }}>Mobility & Injury Rehab</option>
+//                         <option value="powerlifting" style={{ background: 'var(--bg-elev)' }}>Strength & Powerlifting</option>
 //                       </select>
 //                     </div>
 //                   </div>
@@ -293,7 +293,7 @@
 
 //                   <div style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '24px', backdropFilter: 'blur(10px)' }}>
 //                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontSize: '16px', marginBottom: '20px', fontWeight: '600' }}>
-//                       <Activity size={18} color="#60A5FA" /> Lifestyle & Health
+//                       <Activity size={18} color="var(--blue)" /> Lifestyle & Health
 //                     </h3>
 //                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 //                       <div>
@@ -303,9 +303,9 @@
 //                           onChange={(e) => setActivityLevel(e.target.value)}
 //                           style={{...inputStyle, WebkitAppearance: 'none', backgroundImage: selectBg, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px top 50%', backgroundSize: '10px auto'}}
 //                         >
-//                           <option value="sedentary" style={{ background: '#111' }}>Sedentary (Desk job, minimal movement)</option>
-//                           <option value="moderate" style={{ background: '#111' }}>Moderately Active (3-5 workouts/week)</option>
-//                           <option value="high" style={{ background: '#111' }}>Very Active (Heavy training / active work)</option>
+//                           <option value="sedentary" style={{ background: 'var(--bg-elev)' }}>Sedentary (Desk job, minimal movement)</option>
+//                           <option value="moderate" style={{ background: 'var(--bg-elev)' }}>Moderately Active (3-5 workouts/week)</option>
+//                           <option value="high" style={{ background: 'var(--bg-elev)' }}>Very Active (Heavy training / active work)</option>
 //                         </select>
 //                       </div>
 //                       <div>
@@ -315,9 +315,9 @@
 //                           onChange={(e) => setPrimaryGoal(e.target.value)}
 //                           style={{...inputStyle, WebkitAppearance: 'none', backgroundImage: selectBg, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px top 50%', backgroundSize: '10px auto'}}
 //                         >
-//                           <option value="fat_loss" style={{ background: '#111' }}>Fat Loss & Definition</option>
-//                           <option value="hypertrophy" style={{ background: '#111' }}>Muscle Hypertrophy</option>
-//                           <option value="recomp" style={{ background: '#111' }}>Body Recomposition</option>
+//                           <option value="fat_loss" style={{ background: 'var(--bg-elev)' }}>Fat Loss & Definition</option>
+//                           <option value="hypertrophy" style={{ background: 'var(--bg-elev)' }}>Muscle Hypertrophy</option>
+//                           <option value="recomp" style={{ background: 'var(--bg-elev)' }}>Body Recomposition</option>
 //                         </select>
 //                       </div>
 //                       <div>
@@ -362,14 +362,14 @@
 //               <div style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '24px', backdropFilter: 'blur(10px)' }}>
 //                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
 //                   <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontSize: '16px', fontWeight: '600', margin: 0 }}>
-//                     <Camera size={18} color="#60A5FA" /> {activeDay} Dietary Recall
+//                     <Camera size={18} color="var(--blue)" /> {activeDay} Dietary Recall
 //                   </h3>
 //                 </div>
 //                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
 //                   {meals.map((meal) => (
 //                     <label 
 //                       key={`${activeDay}-${meal}`} 
-//                       style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '140px', border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-sm)', background: 'rgba(0,0,0,0.2)', cursor: 'pointer', transition: 'all 0.2s ease', textAlign: 'center', padding: '12px' }}
+//                       style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '140px', border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-sm)', background: 'rgb(var(--well-rgb) / 0.2)', cursor: 'pointer', transition: 'all 0.2s ease', textAlign: 'center', padding: '12px' }}
 //                     >
 //                       <Upload size={24} color="var(--text-secondary)" style={{ marginBottom: '12px' }} />
 //                       <span className="label-text" style={{ color: 'var(--text-primary)', marginBottom: '4px' }}>{meal}</span>
@@ -441,7 +441,7 @@ export default function ProvisioningForm() {
   const inputStyle = {
     width: '100%',
     padding: '14px',
-    background: 'rgba(0,0,0,0.4)',
+    background: 'rgb(var(--well-rgb) / 0.4)',
     border: '1px solid var(--border-subtle)',
     borderRadius: 'var(--radius-sm)',
     color: 'var(--text-primary)',
@@ -512,14 +512,14 @@ export default function ProvisioningForm() {
     return (
       <div className="container" style={{ maxWidth: '600px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh' }}>
         <div className="app-card fade-in" style={{ textAlign: 'center', padding: '40px 20px', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)' }}>
-          <div style={{ width: '80px', height: '80px', background: 'rgba(0, 226, 123, 0.1)', border: '1px solid var(--accent-green)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto', boxShadow: '0 0 15px rgba(0, 226, 123, 0.2)' }}>
-            <CheckCircle2 className="neon-green" size={40} color="#00E27B" />
+          <div style={{ width: '80px', height: '80px', background: 'rgb(var(--green-rgb) / 0.1)', border: '1px solid var(--accent-green)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto', boxShadow: '0 0 15px rgb(var(--green-rgb) / 0.2)' }}>
+            <CheckCircle2 className="neon-green" size={40} color="var(--accent-green)" />
           </div>
           <h2 className="glazy-title" style={{ fontSize: '28px', marginBottom: '12px', textTransform: 'none' }}>
             {role === 'COACH' ? 'Coach Provisioned' : 'Client Provisioned'}
           </h2>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', fontSize: '15px' }}>
-            Share these credentials with <strong style={{ color: '#fff' }}>{role === 'COACH' ? coachName : clientName}</strong>. They will be prompted to change this temporary password and complete onboarding on first sign-in.
+            Share these credentials with <strong style={{ color: 'var(--text-primary)' }}>{role === 'COACH' ? coachName : clientName}</strong>. They will be prompted to change this temporary password and complete onboarding on first sign-in.
           </p>
 
           {/* Generated User ID & Temporary Password Cards */}
@@ -602,7 +602,7 @@ export default function ProvisioningForm() {
               {/* Role Selection Dropdown */}
               <div style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '24px', backdropFilter: 'blur(10px)' }}>
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontSize: '16px', marginBottom: '20px', fontWeight: '600' }}>
-                  <Shield size={18} color="#60A5FA" /> Account Provisioning
+                  <Shield size={18} color="var(--blue)" /> Account Provisioning
                 </h3>
                 <div>
                   <label className="label-text">Select Account Type</label>
@@ -615,8 +615,8 @@ export default function ProvisioningForm() {
                     required 
                     style={{...inputStyle, WebkitAppearance: 'none', backgroundImage: selectBg, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px top 50%', backgroundSize: '10px auto'}}
                   >
-                    <option value="CLIENT" style={{ background: '#111' }}>Athlete / Client</option>
-                    <option value="COACH" style={{ background: '#111' }}>Coach / Trainer</option>
+                    <option value="CLIENT" style={{ background: 'var(--bg-elev)' }}>Athlete / Client</option>
+                    <option value="COACH" style={{ background: 'var(--bg-elev)' }}>Coach / Trainer</option>
                   </select>
                 </div>
               </div>
@@ -657,10 +657,10 @@ export default function ProvisioningForm() {
                         onChange={(e) => setCoachSpecialization(e.target.value)}
                         style={{...inputStyle, WebkitAppearance: 'none', backgroundImage: selectBg, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px top 50%', backgroundSize: '10px auto'}}
                       >
-                        <option value="hypertrophy" style={{ background: '#111' }}>Muscle Hypertrophy & Bodybuilding</option>
-                        <option value="nutrition" style={{ background: '#111' }}>Clinical Nutrition & Fat Loss</option>
-                        <option value="mobility" style={{ background: '#111' }}>Mobility & Injury Rehab</option>
-                        <option value="powerlifting" style={{ background: '#111' }}>Strength & Powerlifting</option>
+                        <option value="hypertrophy" style={{ background: 'var(--bg-elev)' }}>Muscle Hypertrophy & Bodybuilding</option>
+                        <option value="nutrition" style={{ background: 'var(--bg-elev)' }}>Clinical Nutrition & Fat Loss</option>
+                        <option value="mobility" style={{ background: 'var(--bg-elev)' }}>Mobility & Injury Rehab</option>
+                        <option value="powerlifting" style={{ background: 'var(--bg-elev)' }}>Strength & Powerlifting</option>
                       </select>
                     </div>
                   </div>
@@ -708,7 +708,7 @@ export default function ProvisioningForm() {
                       disabled={isSubmitting || !clientName.trim() || !clientEmail.trim()}
                       onClick={() => provisionAccount(true)}
                       className="btn-secondary"
-                      style={{ marginTop: '20px', width: '100%', border: '1px solid rgba(229, 184, 105, 0.4)', color: 'var(--accent-gold)' }}
+                      style={{ marginTop: '20px', width: '100%', height: 'auto', minHeight: '48px', padding: '12px 16px', whiteSpace: 'normal', lineHeight: 1.35, border: '1px solid rgb(var(--gold-rgb) / 0.4)', color: 'var(--accent-gold)' }}
                     >
                       {isSubmitting ? 'Generating...' : 'Quick Provision ID & Temp Password (Client Fills Metrics on 1st Login)'}
                     </button>
@@ -759,7 +759,7 @@ export default function ProvisioningForm() {
 
                   <div style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '24px', backdropFilter: 'blur(10px)' }}>
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontSize: '16px', marginBottom: '20px', fontWeight: '600' }}>
-                      <Activity size={18} color="#60A5FA" /> Lifestyle & Health
+                      <Activity size={18} color="var(--blue)" /> Lifestyle & Health
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                       <div>
@@ -769,9 +769,9 @@ export default function ProvisioningForm() {
                           onChange={(e) => setActivityLevel(e.target.value)}
                           style={{...inputStyle, WebkitAppearance: 'none', backgroundImage: selectBg, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px top 50%', backgroundSize: '10px auto'}}
                         >
-                          <option value="sedentary" style={{ background: '#111' }}>Sedentary (Desk job, minimal movement)</option>
-                          <option value="moderate" style={{ background: '#111' }}>Moderately Active (3-5 workouts/week)</option>
-                          <option value="high" style={{ background: '#111' }}>Very Active (Heavy training / active work)</option>
+                          <option value="sedentary" style={{ background: 'var(--bg-elev)' }}>Sedentary (Desk job, minimal movement)</option>
+                          <option value="moderate" style={{ background: 'var(--bg-elev)' }}>Moderately Active (3-5 workouts/week)</option>
+                          <option value="high" style={{ background: 'var(--bg-elev)' }}>Very Active (Heavy training / active work)</option>
                         </select>
                       </div>
                       <div>
@@ -781,9 +781,9 @@ export default function ProvisioningForm() {
                           onChange={(e) => setPrimaryGoal(e.target.value)}
                           style={{...inputStyle, WebkitAppearance: 'none', backgroundImage: selectBg, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px top 50%', backgroundSize: '10px auto'}}
                         >
-                          <option value="fat_loss" style={{ background: '#111' }}>Fat Loss & Definition</option>
-                          <option value="hypertrophy" style={{ background: '#111' }}>Muscle Hypertrophy</option>
-                          <option value="recomp" style={{ background: '#111' }}>Body Recomposition</option>
+                          <option value="fat_loss" style={{ background: 'var(--bg-elev)' }}>Fat Loss & Definition</option>
+                          <option value="hypertrophy" style={{ background: 'var(--bg-elev)' }}>Muscle Hypertrophy</option>
+                          <option value="recomp" style={{ background: 'var(--bg-elev)' }}>Body Recomposition</option>
                         </select>
                       </div>
                       <div>
@@ -828,14 +828,14 @@ export default function ProvisioningForm() {
               <div style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '24px', backdropFilter: 'blur(10px)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                   <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontSize: '16px', fontWeight: '600', margin: 0 }}>
-                    <Camera size={18} color="#60A5FA" /> {activeDay} Dietary Recall
+                    <Camera size={18} color="var(--blue)" /> {activeDay} Dietary Recall
                   </h3>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
                   {meals.map((meal) => (
                     <label 
                       key={`${activeDay}-${meal}`} 
-                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '140px', border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-sm)', background: 'rgba(0,0,0,0.2)', cursor: 'pointer', transition: 'all 0.2s ease', textAlign: 'center', padding: '12px' }}
+                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '140px', border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-sm)', background: 'rgb(var(--well-rgb) / 0.2)', cursor: 'pointer', transition: 'all 0.2s ease', textAlign: 'center', padding: '12px' }}
                     >
                       <Upload size={24} color="var(--text-secondary)" style={{ marginBottom: '12px' }} />
                       <span className="label-text" style={{ color: 'var(--text-primary)', marginBottom: '4px' }}>{meal}</span>

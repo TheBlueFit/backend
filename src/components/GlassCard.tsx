@@ -12,9 +12,9 @@ interface GlassCardProps {
 export function GlassCard({ title, subtitle, statusText, statusColor = 'green', Icon }: GlassCardProps) {
   const getStatusStyles = () => {
     switch (statusColor) {
-      case 'green': return { color: '#00E27B', bg: 'rgba(0, 226, 123, 0.1)', border: 'rgba(0, 226, 123, 0.3)' };
-      case 'red': return { color: '#FF453A', bg: 'rgba(255, 69, 58, 0.1)', border: 'rgba(255, 69, 58, 0.3)' };
-      case 'gold': return { color: '#E5B869', bg: 'rgba(229, 184, 105, 0.1)', border: 'rgba(229, 184, 105, 0.3)' };
+      case 'green': return { color: 'var(--accent-green)', bg: 'rgb(var(--green-rgb) / 0.1)', border: 'rgb(var(--green-rgb) / 0.3)' };
+      case 'red': return { color: 'var(--danger)', bg: 'rgb(var(--red-rgb) / 0.1)', border: 'rgb(var(--red-rgb) / 0.3)' };
+      case 'gold': return { color: 'var(--accent-gold)', bg: 'rgb(var(--gold-rgb) / 0.1)', border: 'rgb(var(--gold-rgb) / 0.3)' };
     }
   };
 

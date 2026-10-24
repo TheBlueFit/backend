@@ -19,7 +19,9 @@ import {
   Utensils,
   X,
 } from "lucide-react";
-import { authSession, UserSession } from "@/services/api";
+import { authSession, dashboardAPI, sessionExpired, UserSession } from "@/services/api";
+import ThemeProvider, { ThemeToggle, THEME_INIT_SCRIPT } from "@/components/shell/ThemeProvider";
+import { AppContext } from "@/components/shell/AppContext";
 import MobilePermissionsGate from "@/components/shared/MobilePermissionsGate";
 
 type NavItem = {
@@ -38,6 +40,7 @@ const NAVIGATION: Record<"ADMIN" | "COACH" | "CLIENT", NavItem[]> = {
     { href: "/coach", label: "Dashboard", Icon: LayoutDashboard },
     { href: "/coach/clients", label: "Client Roster", Icon: Users },
     { href: "/coach/templates", label: "Plan Templates", Icon: Activity },
+    { href: "/coach/messages", label: "Messages", Icon: MessageSquare },
   ],
   CLIENT: [
     { href: "/client", label: "Today", Icon: LayoutDashboard },
@@ -57,6 +60,7 @@ const PORTAL_LABEL: Record<"ADMIN" | "COACH" | "CLIENT", string> = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [session, setSession] = useState<UserSession | null>(null);
+  const [unread, setUnread] = useState(0);
   // Fix 4 (iframe): detect iframe context with a hydration-safe external-store snapshot.
   // Server snapshot is always false; the client snapshot can safely inspect window.
   const isInIframe = useSyncExternalStore(
@@ -85,7 +89,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     const syncAuth = () => {
       let current = authSession.get();
 
-      if (current && !current.token) {
+      if (current && (!current.token || sessionExpired(current))) {
         authSession.clear();
         current = null;
       }
@@ -273,7 +277,30 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     }
   }, []);
 
+  const beat = React.useCallback(async () => {
+    if (document.visibilityState !== "visible") return;
+    try {
+      const res = await dashboardAPI.ping();
+      setUnread(res.unreadMessages || 0);
+    } catch { /* offline or signed out */ }
+  }, []);
+
+  useEffect(() => {
+    if (!session?.token) return;
+    beat();
+    const id = window.setInterval(beat, 45_000);
+    const onVisible = () => { if (document.visibilityState === "visible") beat(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", beat);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", beat);
+    };
+  }, [session?.PK, session?.token, beat]);
+
   const handleLogout = () => {
+    dashboardAPI.logout().catch(() => {});
     authSession.clear();
     setIsMenuOpen(false);
     router.replace("/");
@@ -283,11 +310,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // navigation and permissions gate from ever covering the in-app schedule preview.
   if (isInIframe || pathname === "/client/schedules/view") {
     return (
-      <html lang="en" className="dark">
+      <html lang="en" className="dark" suppressHydrationWarning>
         <head>
           <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+          <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
           <link rel="manifest" href="/manifest.json" />
-          <meta name="theme-color" content="#050505" />
+          <meta name="theme-color" content="#000000" />
           <meta name="mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -295,8 +323,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <link rel="apple-touch-icon" href="/icons/icon-192.png" />
           <link rel="apple-touch-startup-image" href="/icons/icon-512.png" />
         </head>
-        <body style={{ margin: 0, background: "#050505" }}>
-          {children}
+        <body style={{ margin: 0, background: "var(--bg-elev)" }}>
+          <ThemeProvider>{children}</ThemeProvider>
         </body>
       </html>
     );
@@ -304,11 +332,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   if (pathname === "/") {
     return (
-      <html lang="en" className="dark">
+      <html lang="en" className="dark" suppressHydrationWarning>
         <head>
           <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+          <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
           <link rel="manifest" href="/manifest.json" />
-          <meta name="theme-color" content="#050505" />
+          <meta name="theme-color" content="#000000" />
           <meta name="mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -317,9 +346,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <link rel="apple-touch-startup-image" href="/icons/icon-512.png" />
         </head>
         <body>
-          <main className="main-content" style={{ width: "100%" }}>
-            {children}
-          </main>
+          <ThemeProvider>
+            <div className="theme-fab"><ThemeToggle compact /></div>
+            <main className="main-content" style={{ width: "100%" }}>
+              {children}
+            </main>
+          </ThemeProvider>
         </body>
       </html>
     );
@@ -330,14 +362,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const portalLabel = role ? PORTAL_LABEL[role] : "THE BLUE FIT";
 
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <meta
           name="viewport"
           content="width=device-width, initial-scale=1, viewport-fit=cover"
         />
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body>
+       <ThemeProvider>
+        <AppContext.Provider value={{ session, unread, setUnread, refreshUnread: beat }}>
         <div className="app-container">
           <header className="mobile-header">
             <span className="glazy-title" style={{ fontSize: "18px" }}>
@@ -355,11 +390,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             onClick={() => setIsMenuOpen((open) => !open)}
           >
             {isMenuOpen ? (
-              <X size={24} color="#fff" />
+              <X size={24} color="currentColor" />
             ) : (
-              <Menu size={24} color="#fff" />
+              <Menu size={24} color="currentColor" />
             )}
           </button>
+
+          <div className="theme-fab"><ThemeToggle compact /></div>
 
           {/* Floating navigation stack. It pops out from the left-side hamburger
               using the compact button treatment from the original reference UI. */}
@@ -389,6 +426,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 >
                   <Icon size={21} strokeWidth={1.8} />
                   <span>{label}</span>
+                  {href.endsWith("/messages") && unread > 0 && <span className="msg-badge">{unread > 99 ? "99+" : unread}</span>}
                   <span className="bluefit-pop-nav-indicator" aria-hidden="true" />
                 </Link>
               );
@@ -408,6 +446,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <main className="main-content">{children}</main>
           </MobilePermissionsGate>
         </div>
+        </AppContext.Provider>
+       </ThemeProvider>
       </body>
     </html>
   );

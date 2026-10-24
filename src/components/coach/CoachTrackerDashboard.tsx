@@ -14,6 +14,7 @@ import {
 
 import MetricCard from "@/components/shared/MetricCard";
 import ProgressRing from "@/components/shared/ProgressRing";
+import { mix } from "@/lib/format";
 
 interface CoachTrackerDashboardProps {
   activeClients?: number;
@@ -95,7 +96,7 @@ function CoachPulseRings({
                 cy={center}
                 r={radius}
                 fill="none"
-                stroke="rgba(255,255,255,0.045)"
+                stroke="rgb(var(--ink-rgb) / 0.045)"
                 strokeWidth={widths[index]}
               />
 
@@ -187,7 +188,7 @@ function CoachLegend({
           borderRadius: "999px",
           background: color,
           opacity: value === "—" ? 0.25 : 1,
-          boxShadow: `0 0 7px ${color}33`,
+          boxShadow: `0 0 7px ${mix(color, "33")}`,
         }}
       />
 
@@ -207,7 +208,7 @@ function CoachLegend({
           style={{
             marginTop: "3px",
             fontSize: "11px",
-            color: "rgba(255,255,255,0.46)",
+            color: "rgb(var(--ink-rgb) / 0.46)",
           }}
         >
           {detail}
@@ -221,7 +222,7 @@ function CoachLegend({
           color:
             value === "—"
               ? "var(--text-secondary)"
-              : "rgba(255,255,255,0.82)",
+              : "rgb(var(--ink-rgb) / 0.82)",
         }}
       >
         {value}
@@ -247,8 +248,8 @@ function Signal({
         className="bf-signal-icon"
         style={{
           color: accent,
-          background: `${accent}0f`,
-          borderColor: `${accent}18`,
+          background: `${mix(accent, "0f")}`,
+          borderColor: `${mix(accent, "18")}`,
         }}
       >
         <Icon size={15} />

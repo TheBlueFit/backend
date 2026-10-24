@@ -15,7 +15,7 @@ export function generateStaticParams() {
 
 export default function TemplateConfigurationPage() {
   return (
-    <Suspense fallback={<div style={{ padding: '24px', color: 'white' }}>Loading configuration...</div>}>
+    <Suspense fallback={<div style={{ padding: '24px', color: 'var(--text-primary)' }}>Loading configuration...</div>}>
       <TemplateClient />
     </Suspense>
   );

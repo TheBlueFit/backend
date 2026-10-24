@@ -8,7 +8,7 @@ Parameters:
     Description: >-
       Websites / apps allowed to call this API from a browser. Add your production web
       domain here and, for phone testing on your Wi-Fi, your dev server address.
-    Default: "http://localhost:3000,http://localhost,https://localhost"
+    Default: "http://localhost:3000,http://localhost,https://localhost,capacitor://localhost,https://bluefit-1g5.pages.dev"
 
 Globals:
   Function:
@@ -78,13 +78,15 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       DefaultRouteSettings:
-        ThrottlingBurstLimit: 20
-        ThrottlingRateLimit: 10
+        # Chat polling + the 45-second presence heartbeat from every open app share this limit.
+        ThrottlingBurstLimit: 200
+        ThrottlingRateLimit: 100
       CorsConfiguration:
         AllowOrigins: !Ref AllowedOrigins
         AllowHeaders:
           - Authorization
           - Content-Type
+          - Accept
         AllowMethods:
           - GET
           - POST

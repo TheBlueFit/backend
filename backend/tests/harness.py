@@ -22,6 +22,9 @@ class Attr:
     def eq(self, v): return Cond(lambda it: it.get(self.n) == v)
     def begins_with(self, v): return Cond(lambda it: str(it.get(self.n, '')).startswith(v))
     def is_in(self, vs): return Cond(lambda it: it.get(self.n) in vs)
+    def between(self, lo, hi): return Cond(lambda it: lo <= str(it.get(self.n, '')) <= hi)
+    def gt(self, v): return Cond(lambda it: str(it.get(self.n, '')) > v)
+    def lt(self, v): return Cond(lambda it: str(it.get(self.n, '')) < v)
 Key = Attr
 
 def assert_dynamo_safe(obj, path=''):
@@ -53,17 +56,28 @@ class FakeTable:
         if it is None:
             if ConditionExpression: raise ClientError({'Error': {'Code': 'ConditionalCheckFailedException'}})
             it = dict(Key); self.d[self._k(Key)] = it
-        assert UpdateExpression.startswith('SET ')
+        import re
+        m = re.match(r'^\s*SET\s+(.*?)(?:\s+ADD\s+(.*))?$', UpdateExpression)
+        if m: sets, adds = m.group(1), m.group(2) or ''
+        else:
+            m = re.match(r'^\s*ADD\s+(.*)$', UpdateExpression); assert m, UpdateExpression
+            sets, adds = '', m.group(1)
+        names = ExpressionAttributeNames or {}
         out = {}
-        for part in UpdateExpression[4:].split(','):
+        for part in [p for p in sets.split(',') if p.strip()]:
             lhs, rhs = [s.strip() for s in part.split('=')]
-            lhs = (ExpressionAttributeNames or {}).get(lhs, lhs)
+            lhs = names.get(lhs, lhs)
             it[lhs] = ExpressionAttributeValues[rhs]; out[lhs] = it[lhs]
+        for part in [p for p in adds.split(',') if p.strip()]:
+            lhs, rhs = part.strip().split()
+            lhs = names.get(lhs, lhs)
+            it[lhs] = it.get(lhs, 0) + ExpressionAttributeValues[rhs]; out[lhs] = it[lhs]
         return {'Attributes': out} if ReturnValues else {}
-    def scan(self, FilterExpression=None, ExclusiveStartKey=None, ProjectionExpression=None):
+    def scan(self, FilterExpression=None, ExclusiveStartKey=None, ProjectionExpression=None, ExpressionAttributeNames=None):
         items = [copy.deepcopy(v) for v in self.d.values() if FilterExpression is None or FilterExpression.fn(v)]
         if ProjectionExpression:
-            keep = [k.strip() for k in ProjectionExpression.split(',')]
+            names = ExpressionAttributeNames or {}
+            keep = [names.get(k.strip(), k.strip()) for k in ProjectionExpression.split(',')]
             items = [{k: v for k, v in it.items() if k in keep} for it in items]
         return {'Items': items}
     def query(self, KeyConditionExpression, ScanIndexForward=True, Limit=None, ExclusiveStartKey=None):

@@ -20,6 +20,7 @@
  */
 
 import React, { useEffect, useId, useRef, useState } from "react";
+import { mix } from "@/lib/format";
 
 export type FillerShape =
   | "footsteps"
@@ -112,7 +113,7 @@ function Droplet({ accent, size, pct, idle }: Inner) {
     <svg className="bf-sf" viewBox="0 0 64 64" width={size} height={size} aria-hidden="true">
       <defs><clipPath id={clip}><path d={path} /></clipPath><Defs gradId={grad} accent={accent} /></defs>
       <g className={idle ? undefined : "bf-sf-bob"}>
-        <path d={path} fill={`${accent}12`} />
+        <path d={path} fill={`${mix(accent, "12")}`} />
         <Liquid clipId={clip} gradId={grad} vw={64} vh={64} pct={pct} accent={accent} idle={idle} />
         {!idle && pct > 8 && (
           <g clipPath={`url(#${clip})`} fill="#fff">
@@ -138,7 +139,7 @@ function Heart({ accent, size, pct, idle }: Inner) {
     <svg className="bf-sf" viewBox="0 0 64 64" width={size} height={size} aria-hidden="true">
       <defs><clipPath id={clip}><path d={path} /></clipPath><Defs gradId={grad} accent={accent} /></defs>
       <g className={idle ? undefined : "bf-sf-beat"}>
-        <path d={path} fill={`${accent}14`} />
+        <path d={path} fill={`${mix(accent, "14")}`} />
         <Liquid clipId={clip} gradId={grad} vw={64} vh={64} pct={pct} accent={accent} amp={2} idle={idle} />
         <g clipPath={`url(#${clip})`}>
           <path
@@ -167,7 +168,7 @@ function Moon({ accent, size, pct, idle }: Inner) {
     <svg className="bf-sf" viewBox="0 0 68 64" width={size} height={size * (64 / 68)} aria-hidden="true">
       <defs><clipPath id={clip}><path d={path} /></clipPath><Defs gradId={grad} accent={accent} /></defs>
       <g className={idle ? undefined : "bf-sf-rock"}>
-        <path d={path} fill={`${accent}12`} />
+        <path d={path} fill={`${mix(accent, "12")}`} />
         <Liquid clipId={clip} gradId={grad} vw={68} vh={64} pct={pct} accent={accent} amp={2} idle={idle} />
         <path d={path} fill="none" stroke={accent} strokeOpacity={idle ? 0.3 : 0.75} strokeWidth="1.8" strokeLinejoin="round" />
       </g>
@@ -198,7 +199,7 @@ function Barbell({ accent, size, pct, idle }: Inner) {
         <Defs gradId={grad} accent={accent} />
       </defs>
       <g className={idle ? undefined : "bf-sf-lift"}>
-        <path d={`${plates} ${bar}`} fill={`${accent}14`} />
+        <path d={`${plates} ${bar}`} fill={`${mix(accent, "14")}`} />
         <Liquid clipId={clip} gradId={grad} vw={80} vh={52} pct={pct} accent={accent} amp={1.6} idle={idle} />
         <path d={`${plates} ${bar}`} fill="none" stroke={accent} strokeOpacity={idle ? 0.3 : 0.8} strokeWidth="1.4" strokeLinejoin="round" />
         <rect x="30" y="22" width="20" height="4" fill="none" stroke="#fff" strokeOpacity={idle ? 0.1 : 0.35} strokeDasharray="1.5 2.5" />
@@ -223,7 +224,7 @@ function Flame({ accent, size, pct, idle }: Inner) {
     <svg className="bf-sf" viewBox="0 0 64 64" width={size} height={size} aria-hidden="true">
       <defs><clipPath id={clip}><path d={path} /></clipPath><Defs gradId={grad} accent={accent} /></defs>
       <g className={idle ? undefined : "bf-sf-flicker"}>
-        <path d={path} fill={`${accent}14`} />
+        <path d={path} fill={`${mix(accent, "14")}`} />
         <Liquid clipId={clip} gradId={grad} vw={64} vh={64} pct={pct} accent={accent} amp={2.4} idle={idle} />
         {!idle && pct > 5 && (
           <path className="bf-sf-inner-flame" clipPath={`url(#${clip})`} fill="#fff" fillOpacity="0.35"
@@ -256,7 +257,7 @@ function People({ accent, size, pct, idle }: Inner) {
           <circle className="bf-sf-radar" cx="34" cy="34" r="22" fill="none" stroke={accent} strokeWidth="1.2" style={{ animationDelay: "1.3s" }} />
         </>
       )}
-      <path d={`${back} ${front}`} fill={`${accent}14`} />
+      <path d={`${back} ${front}`} fill={`${mix(accent, "14")}`} />
       <Liquid clipId={clip} gradId={grad} vw={68} vh={64} pct={pct} accent={accent} amp={2} idle={idle} />
       <path d={back} fill="none" stroke={accent} strokeOpacity={idle ? 0.25 : 0.55} strokeWidth="1.5" />
       <path d={front} fill="none" stroke={accent} strokeOpacity={idle ? 0.3 : 0.85} strokeWidth="1.8" />
@@ -272,7 +273,7 @@ function Bolt({ accent, size, pct, idle }: Inner) {
     <svg className="bf-sf" viewBox="0 0 64 64" width={size} height={size} aria-hidden="true" style={{ color: accent }}>
       <defs><clipPath id={clip}><path d={path} /></clipPath><Defs gradId={grad} accent={accent} /></defs>
       <g className={idle ? undefined : "bf-sf-zap"}>
-        <path d={path} fill={`${accent}14`} />
+        <path d={path} fill={`${mix(accent, "14")}`} />
         <Liquid clipId={clip} gradId={grad} vw={64} vh={64} pct={pct} accent={accent} amp={2} idle={idle} />
         <path d={path} fill="none" stroke={accent} strokeOpacity={idle ? 0.3 : 0.85} strokeWidth="1.8" strokeLinejoin="round" />
       </g>
@@ -306,7 +307,7 @@ function Footsteps({ accent, size, pct, idle }: Inner) {
         <Defs gradId={grad} accent={accent} />
       </defs>
       <g clipPath={`url(#${clip})`}>
-        <rect width="64" height="72" fill={`${accent}0d`} />
+        <rect width="64" height="72" fill={`${mix(accent, "0d")}`} />
         <g transform={`translate(0 ${72 - (pct / 100) * 72})`} style={{ ["--bf-w" as string]: "64px" } as React.CSSProperties}>
           <path className="bf-sf-wave-b" d={wavePath(64, 1.8, 140, 1.2)} fill={accent} opacity={idle ? 0.06 : 0.16} />
           <path className="bf-sf-wave-a" d={wavePath(64, 2.2, 140)} fill={accent} opacity={idle ? 0.08 : 0.26} />

@@ -4,8 +4,8 @@
   "description": "The Blue Fit — athlete training, recovery and nutrition platform.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#050505",
-  "theme_color": "#050505",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "orientation": "portrait",
   "icons": [
     {

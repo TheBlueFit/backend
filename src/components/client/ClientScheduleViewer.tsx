@@ -38,8 +38,8 @@ function humanDate(value: string) {
 
 const pillStyle: React.CSSProperties = {
   fontSize: 11, padding: "5px 9px", borderRadius: 8,
-  background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.78)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  background: "rgb(var(--ink-rgb) / 0.06)", color: "rgb(var(--ink-rgb) / 0.78)",
+  border: "1px solid rgb(var(--ink-rgb) / 0.08)",
 };
 
 export default function ClientScheduleViewer({ assignmentId, title, onClose }: Props) {
@@ -83,35 +83,35 @@ export default function ClientScheduleViewer({ assignmentId, title, onClose }: P
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{
         position: "fixed", inset: 0, zIndex: 2000,
-        background: "rgba(0,0,0,0.82)", backdropFilter: "blur(12px)",
+        background: "rgb(var(--well-rgb) / 0.82)", backdropFilter: "blur(12px)",
         display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
       }}
     >
       <div style={{
         width: "min(740px,100%)", height: "min(92vh,860px)",
         display: "flex", flexDirection: "column",
-        background: "#070707", border: "1px solid rgba(255,255,255,0.11)",
-        borderRadius: 20, overflow: "hidden", boxShadow: "0 30px 100px rgba(0,0,0,0.6)",
+        background: "#070707", border: "1px solid rgb(var(--ink-rgb) / 0.11)",
+        borderRadius: 20, overflow: "hidden", boxShadow: "0 30px 100px rgb(var(--well-rgb) / 0.6)",
       }}>
 
         {/* Header */}
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
           padding: "13px 14px 13px 20px",
-          borderBottom: "1px solid rgba(255,255,255,0.07)",
-          background: "rgba(255,255,255,0.022)", flexShrink: 0,
+          borderBottom: "1px solid rgb(var(--ink-rgb) / 0.07)",
+          background: "rgb(var(--ink-rgb) / 0.022)", flexShrink: 0,
         }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 9, color: "var(--text-secondary)", letterSpacing: "0.14em", textTransform: "uppercase" }}>
               ASSIGNED WORKOUT
             </div>
-            <div style={{ color: "#fff", fontSize: 15, fontWeight: 700, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div style={{ color: "var(--text-primary)", fontSize: 15, fontWeight: 700, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {title || "Workout Schedule"}
             </div>
           </div>
           <button
             type="button" onClick={onClose} aria-label="Close workout schedule"
-            style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.04)", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
+            style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid rgb(var(--ink-rgb) / 0.10)", background: "rgb(var(--ink-rgb) / 0.04)", color: "var(--text-primary)", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
           >
             <X size={18} />
           </button>
@@ -129,7 +129,7 @@ export default function ClientScheduleViewer({ assignmentId, title, onClose }: P
 
           {!loading && error && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 200, textAlign: "center", gap: 12 }}>
-              <AlertCircle size={28} color="#E5B869" />
+              <AlertCircle size={28} color="var(--accent-gold)" />
               <div style={{ fontSize: 15, fontWeight: 700 }}>Schedule unavailable</div>
               <div style={{ color: "var(--text-secondary)", fontSize: 13, maxWidth: 320 }}>{error}</div>
             </div>
@@ -140,7 +140,7 @@ export default function ClientScheduleViewer({ assignmentId, title, onClose }: P
               {/* Title block */}
               <div style={{ marginBottom: 18 }}>
                 <div style={{ color: "var(--accent-gold)", fontSize: 9, letterSpacing: "0.16em", fontWeight: 700, textTransform: "uppercase" }}>THE BLUE FIT</div>
-                <h1 style={{ fontSize: 22, margin: "6px 0 0", lineHeight: 1.2, color: "#fff" }}>
+                <h1 style={{ fontSize: 22, margin: "6px 0 0", lineHeight: 1.2, color: "var(--text-primary)" }}>
                   {schedule.templateTitle || "Workout Schedule"}
                 </h1>
                 <div style={{ color: "var(--text-secondary)", fontSize: 12, marginTop: 6 }}>
@@ -157,7 +157,7 @@ export default function ClientScheduleViewer({ assignmentId, title, onClose }: P
                   ["Duration",  schedule.estimatedDuration || "—"],
                   ["Equipment", schedule.equipment         || "—"],
                 ].map(([label, value]) => (
-                  <div key={String(label)} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 13, padding: 13 }}>
+                  <div key={String(label)} style={{ background: "rgb(var(--ink-rgb) / 0.03)", border: "1px solid rgb(var(--ink-rgb) / 0.07)", borderRadius: 13, padding: 13 }}>
                     <div style={{ fontSize: 9, letterSpacing: "0.12em", color: "var(--text-secondary)", textTransform: "uppercase" }}>{label}</div>
                     <div style={{ marginTop: 5, fontSize: 13 }}>{value}</div>
                   </div>
@@ -166,9 +166,9 @@ export default function ClientScheduleViewer({ assignmentId, title, onClose }: P
 
               {/* Coach notes */}
               {schedule.notes && (
-                <div style={{ marginBottom: 16, background: "rgba(229,184,105,0.05)", border: "1px solid rgba(229,184,105,0.14)", borderRadius: 13, padding: 14 }}>
+                <div style={{ marginBottom: 16, background: "rgb(var(--gold-rgb) / 0.05)", border: "1px solid rgb(var(--gold-rgb) / 0.14)", borderRadius: 13, padding: 14 }}>
                   <div style={{ fontSize: 9, letterSpacing: "0.12em", color: "var(--accent-gold)", textTransform: "uppercase" }}>Coach notes</div>
-                  <div style={{ marginTop: 7, color: "rgba(255,255,255,0.80)", fontSize: 13, lineHeight: 1.6 }}>{schedule.notes}</div>
+                  <div style={{ marginTop: 7, color: "rgb(var(--ink-rgb) / 0.80)", fontSize: 13, lineHeight: 1.6 }}>{schedule.notes}</div>
                 </div>
               )}
 
@@ -180,15 +180,15 @@ export default function ClientScheduleViewer({ assignmentId, title, onClose }: P
                 {exercises.map((ex: any, index: number) => (
                   <section
                     key={String(ex.id || ex.order || index)}
-                    style={{ background: "rgba(255,255,255,0.032)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 15 }}
+                    style={{ background: "rgb(var(--ink-rgb) / 0.032)", border: "1px solid rgb(var(--ink-rgb) / 0.07)", borderRadius: 14, padding: 15 }}
                   >
                     <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                      <div style={{ width: 34, height: 34, borderRadius: 10, display: "grid", placeItems: "center", background: "rgba(0,226,123,0.09)", color: "#00E27B", flexShrink: 0 }}>
+                      <div style={{ width: 34, height: 34, borderRadius: 10, display: "grid", placeItems: "center", background: "rgb(var(--green-rgb) / 0.09)", color: "var(--accent-green)", flexShrink: 0 }}>
                         <Dumbbell size={16} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                          <h2 style={{ fontSize: 14, margin: 0, color: "#fff" }}>{index + 1}. {ex.name || "Exercise"}</h2>
+                          <h2 style={{ fontSize: 14, margin: 0, color: "var(--text-primary)" }}>{index + 1}. {ex.name || "Exercise"}</h2>
                           {ex.section && <span style={{ fontSize: 10, color: "var(--accent-gold)", whiteSpace: "nowrap" }}>{ex.section}</span>}
                         </div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 9 }}>

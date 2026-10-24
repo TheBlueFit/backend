@@ -40,16 +40,16 @@ function buildFrameDoc(src: string, alt: string): string {
 <meta name="referrer" content="no-referrer">
 <style>
   *{box-sizing:border-box}
-  html,body{margin:0;height:100%;background:#050507;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+  html,body{margin:0;height:100%;background:var(--bg-elev);color:var(--text-primary);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden}
   #stage{position:absolute;inset:0 0 56px 0;overflow:auto;display:flex;padding:14px;-webkit-overflow-scrolling:touch}
   #box{position:relative;margin:auto;flex:none}
-  #im{position:absolute;left:50%;top:50%;max-width:none;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.55);transition:width .18s ease,height .18s ease,transform .18s ease;user-select:none;-webkit-user-drag:none}
-  #bar{position:absolute;left:0;right:0;bottom:0;height:56px;display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(255,255,255,.04);border-top:1px solid rgba(255,255,255,.08)}
-  button{height:36px;min-width:40px;padding:0 12px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);color:#fff;font:600 13px inherit;cursor:pointer}
-  button:hover{background:rgba(255,255,255,.14)}
-  #pct{min-width:48px;text-align:center;font-size:12px;color:rgba(255,255,255,.65)}
-  #err{display:none;margin:auto;max-width:320px;text-align:center;line-height:1.5;color:rgba(255,255,255,.72);font-size:13px}
-  #err b{display:block;color:#ff6b61;font-size:15px;margin-bottom:6px}
+  #im{position:absolute;left:50%;top:50%;max-width:none;border-radius:10px;box-shadow:0 12px 40px rgb(var(--shadow-rgb) / .55);transition:width .18s ease,height .18s ease,transform .18s ease;user-select:none;-webkit-user-drag:none}
+  #bar{position:absolute;left:0;right:0;bottom:0;height:56px;display:flex;align-items:center;justify-content:center;gap:8px;background:rgb(var(--ink-rgb) / .04);border-top:1px solid rgb(var(--ink-rgb) / .08)}
+  button{height:36px;min-width:40px;padding:0 12px;border-radius:9px;border:1px solid rgb(var(--ink-rgb) / .14);background:rgb(var(--ink-rgb) / .07);color:var(--text-primary);font:600 13px inherit;cursor:pointer}
+  button:hover{background:rgb(var(--ink-rgb) / .14)}
+  #pct{min-width:48px;text-align:center;font-size:12px;color:rgb(var(--ink-rgb) / .65)}
+  #err{display:none;margin:auto;max-width:320px;text-align:center;line-height:1.5;color:rgb(var(--ink-rgb) / .72);font-size:13px}
+  #err b{display:block;color:var(--danger);font-size:15px;margin-bottom:6px}
 </style></head><body>
 <div id="stage">
   <div id="box"><img id="im" alt="${esc(alt)}" src="${esc(src)}" draggable="false"></div>
@@ -148,7 +148,7 @@ export default function MediaViewerModal({ objectKey, url, title, onClose }: Pro
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{
         position: "fixed", inset: 0, zIndex: 3000,
-        background: "rgba(0,0,0,0.86)", backdropFilter: "blur(10px)",
+        background: "rgb(var(--well-rgb) / 0.86)", backdropFilter: "blur(10px)",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: "max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom))",
       }}
@@ -157,37 +157,37 @@ export default function MediaViewerModal({ objectKey, url, title, onClose }: Pro
         style={{
           width: "min(860px, 100%)", height: "min(88vh, 760px)",
           display: "flex", flexDirection: "column",
-          background: "#08080c", border: "1px solid rgba(255,255,255,0.11)",
-          borderRadius: 20, overflow: "hidden", boxShadow: "0 30px 100px rgba(0,0,0,0.6)",
+          background: "#08080c", border: "1px solid rgb(var(--ink-rgb) / 0.11)",
+          borderRadius: 20, overflow: "hidden", boxShadow: "0 30px 100px rgb(var(--well-rgb) / 0.6)",
         }}
       >
         <div
           style={{
             display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
             padding: "13px 14px 13px 20px", flexShrink: 0,
-            borderBottom: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.022)",
+            borderBottom: "1px solid rgb(var(--ink-rgb) / 0.07)", background: "rgb(var(--ink-rgb) / 0.022)",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-            <span style={{ width: 34, height: 34, borderRadius: 10, display: "grid", placeItems: "center", background: "rgba(229,184,105,0.1)", color: "#E5B869", flexShrink: 0 }}>
+            <span style={{ width: 34, height: 34, borderRadius: 10, display: "grid", placeItems: "center", background: "rgb(var(--gold-rgb) / 0.1)", color: "var(--accent-gold)", flexShrink: 0 }}>
               <ImageIcon size={16} />
             </span>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "#E5B869", fontWeight: 700 }}>Photo viewer</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div style={{ fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent-gold)", fontWeight: 700 }}>Photo viewer</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {displayTitle}
               </div>
             </div>
           </div>
           <button
             type="button" onClick={onClose} aria-label="Close photo viewer"
-            style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.05)", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
+            style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid rgb(var(--ink-rgb) / 0.12)", background: "rgb(var(--ink-rgb) / 0.05)", color: "var(--text-primary)", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
           >
             <X size={18} />
           </button>
         </div>
 
-        <div style={{ position: "relative", flex: 1, minHeight: 0, background: "#050507" }}>
+        <div style={{ position: "relative", flex: 1, minHeight: 0, background: "var(--bg-elev)" }}>
           {loadState === "loading" && (
             <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "var(--text-secondary)", textAlign: "center" }}>
               <div>
@@ -200,8 +200,8 @@ export default function MediaViewerModal({ objectKey, url, title, onClose }: Pro
           {loadState === "error" && (
             <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", padding: 24, textAlign: "center" }}>
               <div>
-                <AlertCircle size={34} color="#FF453A" style={{ marginBottom: 10 }} />
-                <p style={{ color: "#FF453A", fontWeight: 700, margin: "0 0 6px" }}>Could not load photo</p>
+                <AlertCircle size={34} color="var(--danger)" style={{ marginBottom: 10 }} />
+                <p style={{ color: "var(--danger)", fontWeight: 700, margin: "0 0 6px" }}>Could not load photo</p>
                 <p style={{ color: "var(--text-secondary)", fontSize: 13, margin: 0 }}>{errorMsg}</p>
               </div>
             </div>
@@ -213,7 +213,7 @@ export default function MediaViewerModal({ objectKey, url, title, onClose }: Pro
               srcDoc={frameDoc}
               sandbox="allow-scripts"
               referrerPolicy="no-referrer"
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, background: "#050507" }}
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, background: "var(--bg-elev)" }}
             />
           )}
         </div>

@@ -65,8 +65,8 @@ function ExerciseCard({ ex, index }: { ex: Exercise; index: number }) {
   return (
     <div
       style={{
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.09)",
+        background: "rgb(var(--ink-rgb) / 0.04)",
+        border: "1px solid rgb(var(--ink-rgb) / 0.09)",
         borderRadius: "14px",
         overflow: "hidden",
         transition: "border-color 0.2s",
@@ -80,20 +80,20 @@ function ExerciseCard({ ex, index }: { ex: Exercise; index: number }) {
         <div
           style={{
             width: "32px", height: "32px", borderRadius: "8px",
-            background: "rgba(229,184,105,0.15)", border: "1px solid rgba(229,184,105,0.3)",
+            background: "rgb(var(--gold-rgb) / 0.15)", border: "1px solid rgb(var(--gold-rgb) / 0.3)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            flexShrink: 0, fontSize: "13px", fontWeight: 700, color: "#E5B869",
+            flexShrink: 0, fontSize: "13px", fontWeight: 700, color: "var(--accent-gold)",
           }}
         >
           {index + 1}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: "14px", fontWeight: 600, color: "#fff", margin: "0 0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <p style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", margin: "0 0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {ex.name}
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
             {chips.map(chip => (
-              <span key={chip} style={{ fontSize: "11px", padding: "2px 8px", background: "rgba(255,255,255,0.07)", borderRadius: "20px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+              <span key={chip} style={{ fontSize: "11px", padding: "2px 8px", background: "rgb(var(--ink-rgb) / 0.07)", borderRadius: "20px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                 {chip}
               </span>
             ))}
@@ -105,7 +105,7 @@ function ExerciseCard({ ex, index }: { ex: Exercise; index: number }) {
       </div>
       {/* Notes */}
       {open && ex.notes && (
-        <div style={{ padding: "0 16px 14px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "12px" }}>
+        <div style={{ padding: "0 16px 14px", borderTop: "1px solid rgb(var(--ink-rgb) / 0.06)", paddingTop: "12px" }}>
           <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: 0, lineHeight: "1.6" }}>{ex.notes}</p>
         </div>
       )}
@@ -118,10 +118,10 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label:
   if (!value) return null;
   return (
     <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-      <div style={{ marginTop: "2px" }}><Icon size={15} color="#E5B869" /></div>
+      <div style={{ marginTop: "2px" }}><Icon size={15} color="var(--accent-gold)" /></div>
       <div>
         <p style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-secondary)", margin: "0 0 2px", fontWeight: 600 }}>{label}</p>
-        <p style={{ fontSize: "14px", color: "#fff", margin: 0, fontWeight: 500 }}>{value}</p>
+        <p style={{ fontSize: "14px", color: "var(--text-primary)", margin: 0, fontWeight: 500 }}>{value}</p>
       </div>
     </div>
   );
@@ -155,7 +155,7 @@ export default function ScheduleModal({ schedule, onClose }: Props) {
       {/* ── Overlay ── */}
       <div
         onClick={onClose}
-        style={{ position: "fixed", inset: 0, zIndex: 900, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)" }}
+        style={{ position: "fixed", inset: 0, zIndex: 900, background: "rgb(var(--well-rgb) / 0.8)", backdropFilter: "blur(8px)" }}
       />
 
       {/* ── Panel ── */}
@@ -176,8 +176,8 @@ export default function ScheduleModal({ schedule, onClose }: Props) {
             width: "100%",
             maxWidth: "680px",
             maxHeight: "calc(100vh - env(safe-area-inset-top, 16px))",
-            background: "rgba(14,14,22,0.97)",
-            border: "1px solid rgba(255,255,255,0.1)",
+            background: "rgb(var(--well-rgb) / 0.97)",
+            border: "1px solid rgb(var(--ink-rgb) / 0.1)",
             borderRadius: "24px 24px 0 0",
             display: "flex",
             flexDirection: "column",
@@ -186,10 +186,10 @@ export default function ScheduleModal({ schedule, onClose }: Props) {
           }}
         >
           {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 20px 16px", borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 20px 16px", borderBottom: "1px solid rgb(var(--ink-rgb) / 0.07)", flexShrink: 0 }}>
             <div style={{ flex: 1, minWidth: 0, paddingRight: "16px" }}>
-              <p style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.14em", color: "#E5B869", margin: "0 0 4px", fontWeight: 700 }}>Your Schedule</p>
-              <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#fff", margin: "0 0 2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <p style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--accent-gold)", margin: "0 0 4px", fontWeight: 700 }}>Your Schedule</p>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-primary)", margin: "0 0 2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {schedule.templateTitle}
               </h2>
               <p style={{ fontSize: "12px", color: "var(--text-secondary)", margin: 0 }}>
@@ -199,7 +199,7 @@ export default function ScheduleModal({ schedule, onClose }: Props) {
             <button
               onClick={onClose}
               aria-label="Close schedule"
-              style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", color: "#fff", cursor: "pointer", padding: "8px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+              style={{ background: "rgb(var(--ink-rgb) / 0.08)", border: "1px solid rgb(var(--ink-rgb) / 0.12)", borderRadius: "10px", color: "var(--text-primary)", cursor: "pointer", padding: "8px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
             >
               <X size={20} />
             </button>
@@ -209,7 +209,7 @@ export default function ScheduleModal({ schedule, onClose }: Props) {
           <div style={{ overflowY: "auto", flex: 1, padding: "20px", display: "flex", flexDirection: "column", gap: "20px", paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))" }}>
 
             {/* Meta grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", padding: "18px", background: "rgba(255,255,255,0.03)", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", padding: "18px", background: "rgb(var(--ink-rgb) / 0.03)", borderRadius: "14px", border: "1px solid rgb(var(--ink-rgb) / 0.07)" }}>
               <InfoRow icon={Target} label="Goal" value={schedule.goal || ""} />
               <InfoRow icon={Zap} label="Level" value={schedule.level || ""} />
               <InfoRow icon={Clock} label="Duration" value={schedule.estimatedDuration || ""} />
@@ -224,19 +224,19 @@ export default function ScheduleModal({ schedule, onClose }: Props) {
 
             {/* Reference image toggle */}
             {schedule.referenceImageUrl && (
-              <div style={{ borderRadius: "14px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <div style={{ borderRadius: "14px", overflow: "hidden", border: "1px solid rgb(var(--ink-rgb) / 0.08)" }}>
                 <button
                   onClick={() => setShowImage(v => !v)}
-                  style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "rgba(255,255,255,0.04)", border: "none", cursor: "pointer", color: "#fff" }}
+                  style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "rgb(var(--ink-rgb) / 0.04)", border: "none", cursor: "pointer", color: "var(--text-primary)" }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <ImageIcon size={16} color="#E5B869" />
+                    <ImageIcon size={16} color="var(--accent-gold)" />
                     <span style={{ fontSize: "13px", fontWeight: 600 }}>Reference Workout Image</span>
                   </div>
                   {showImage ? <ChevronUp size={16} color="var(--text-secondary)" /> : <ChevronDown size={16} color="var(--text-secondary)" />}
                 </button>
                 {showImage && (
-                  <div style={{ background: "#000", maxHeight: "360px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ background: "var(--bg-elev)", maxHeight: "360px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <img
                       src={schedule.referenceImageUrl}
                       alt="Reference workout"
@@ -275,14 +275,14 @@ export default function ScheduleModal({ schedule, onClose }: Props) {
           <div
             style={{
               padding: "14px 20px calc(14px + env(safe-area-inset-bottom, 0px))",
-              borderTop: "1px solid rgba(255,255,255,0.07)",
+              borderTop: "1px solid rgb(var(--ink-rgb) / 0.07)",
               flexShrink: 0,
               display: "flex",
               gap: "12px",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1 }}>
-              <CheckCircle2 size={14} color="#00E27B" />
+              <CheckCircle2 size={14} color="var(--accent-green)" />
               <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
                 Schedule active · {schedule.exercises.length} exercises
               </span>
@@ -290,9 +290,9 @@ export default function ScheduleModal({ schedule, onClose }: Props) {
             <button
               onClick={onClose}
               style={{
-                padding: "10px 24px", background: "rgba(255,255,255,0.07)",
-                border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px",
-                color: "#fff", cursor: "pointer", fontSize: "13px", fontWeight: 600,
+                padding: "10px 24px", background: "rgb(var(--ink-rgb) / 0.07)",
+                border: "1px solid rgb(var(--ink-rgb) / 0.12)", borderRadius: "10px",
+                color: "var(--text-primary)", cursor: "pointer", fontSize: "13px", fontWeight: 600,
               }}
             >
               Close

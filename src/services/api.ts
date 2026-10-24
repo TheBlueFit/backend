@@ -17,6 +17,8 @@ export interface UserSession {
   token?: string;
 }
 
+export type Presence = 'ONLINE' | 'TODAY' | 'RECENT' | 'INACTIVE' | 'NEVER';
+
 export type CoachClient = {
   id: string;
   name: string;
@@ -24,6 +26,15 @@ export type CoachClient = {
   adherence: number;
   lastCheckIn: string;
   status: 'on-track' | 'needs-attention';
+  presence?: Presence;
+  lastSeenAt?: string | null;
+  stepsToday?: number | null;
+  stepsDate?: string | null;
+  stepGoal?: number;
+  sleepHours?: number | null;
+  hydration?: number | null;
+  unreadMessages?: number;
+  [key: string]: any;
 };
 
 const SESSION_KEY = 'bluefit_user_session';
@@ -122,7 +133,7 @@ export const authSession = {
   },
 };
 
-function getLocalDateISO(): string {
+export function getLocalDateISO(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
@@ -134,20 +145,79 @@ function sessionId(): string {
   return id;
 }
 
+// ── Session token helpers ───────────────────────────────────────────────────
+function tokenClaims(token?: string): { exp?: number; iat?: number } {
+  try {
+    const part = (token || '').split('.')[1];
+    if (!part) return {};
+    const json = atob(part.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(part.length / 4) * 4, '='));
+    return JSON.parse(json);
+  } catch {
+    return {};
+  }
+}
+
+/** True when the stored token is past its expiry (the server would reject it anyway). */
+export function sessionExpired(session: UserSession | null): boolean {
+  if (!session?.token) return true;
+  const { exp } = tokenClaims(session.token);
+  return !!exp && exp * 1000 < Date.now();
+}
+
+const REFRESH_AFTER_MS = 24 * 60 * 60 * 1000; // matches the server (renew once a day)
+let refreshing: Promise<void> | null = null;
+
+/** Quietly swaps the token for a fresh 30-day one, so people stay signed in while they keep using the app. */
+async function refreshSessionIfNeeded(): Promise<void> {
+  const session = authSession.get();
+  if (!session?.token || !API_BASE_URL) return;
+  const { iat, exp } = tokenClaims(session.token);
+  const now = Date.now();
+  if (exp && exp * 1000 < now) return; // already dead: the next request will sign the user out
+  if (!iat || now - iat * 1000 < REFRESH_AFTER_MS) return;
+  if (!refreshing) {
+    refreshing = (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const latest = authSession.get();
+          if (data?.token && latest) authSession.set({ ...latest, token: data.token });
+        }
+      } catch {
+        /* offline: try again on the next request */
+      } finally {
+        refreshing = null;
+      }
+    })();
+  }
+  await refreshing;
+}
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!API_BASE_URL) {
     throw new Error('The API address is not configured (set NEXT_PUBLIC_API_URL).');
   }
+  if (!path.startsWith('/auth/')) await refreshSessionIfNeeded();
   const token = authSession.get()?.token;
 
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {}),
+      },
+    });
+  } catch {
+    // Offline / server unreachable: never sign the user out for this
+    throw new NetworkError();
+  }
 
   if (res.status === 401 && token && !path.startsWith('/auth/')) {
     authSession.clear(); // expired / revoked session: the layout sends the user back to sign-in
@@ -165,6 +235,13 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     throw new Error(errorDetail);
   }
   return res.json();
+}
+
+export class NetworkError extends Error {
+  constructor() {
+    super('Cannot reach the server. Check your connection and try again.');
+    this.name = 'NetworkError';
+  }
 }
 
 export interface ThreeDayPhoto {
@@ -224,13 +301,81 @@ export interface ProgressCheckin {
   photos: ProgressPhoto[];
 }
 
+export interface HealthDay {
+  date: string;
+  steps?: number | null;
+  sleepHours?: number | null;
+  hydration?: number | null;
+  calories?: number | null;
+  heartRate?: number | null;
+  stepsPct?: number | null;
+  [key: string]: any;
+}
+
 export interface ClientProgress {
   client: { id: string; name: string; goal: string };
   checkins: ProgressCheckin[];
   summary: { weightChange: number | null; averageAdherence: number | null; totalCheckins: number };
+  profile?: {
+    email?: string; age?: number | null; height?: number | null; startWeight?: number | null;
+    activityLevel?: string | null; primaryGoal?: string | null; medicalNotes?: string | null;
+    memberSince?: string | null; onboardingCompleted?: boolean; presence?: Presence; lastSeenAt?: string | null;
+    [key: string]: any;
+  };
+  health?: HealthDay[];
+  activity?: {
+    stepsLatest: number | null; stepsAvg7d: number | null; stepGoal: number;
+    sleepAvg7d: number | null; hydrationAvg7d: number | null; caloriesAvg7d: number | null;
+    heartRateAvg7d: number | null; daysWithData: number;
+    workoutsDone7d: number; workoutsPlanned7d: number; workoutsCompletion7d: number | null;
+    lastSyncAt: string | null; source: string | null;
+    [key: string]: any;
+  };
 }
 
-export type Presence = 'ONLINE' | 'TODAY' | 'RECENT' | 'INACTIVE' | 'NEVER';
+export interface ChatMessage {
+  id: string;
+  clientMsgId?: string | null;
+  sender: 'CLIENT' | 'COACH';
+  senderName: string;
+  text: string;
+  createdAt: string;
+  mine: boolean;
+  pending?: boolean;
+  failed?: boolean;
+}
+
+export interface ChatPeer {
+  id: string;
+  name: string;
+  role: 'CLIENT' | 'COACH';
+  presence: Presence;
+  lastSeenAt?: string | null;
+  [key: string]: any;
+}
+
+export interface ChatThread {
+  clientId: string;
+  peer: ChatPeer | null;
+  unread: number;
+  lastMessageAt: string | null;
+  lastMessageText: string;
+  lastSender: 'CLIENT' | 'COACH' | null;
+}
+
+export interface ChatPage {
+  messages: ChatMessage[];
+  peer: ChatPeer | null;
+  peerLastReadAt: string | null;
+  hasMore: boolean;
+  canSend: boolean;
+  serverTime: string;
+}
+
+export interface ImportResult {
+  created: any[];
+  skipped: { index: number; title: string; reason: string }[];
+}
 
 export interface MonitorUser {
   id: string;
@@ -247,6 +392,10 @@ export interface MonitorUser {
   pendingFirstLogin: boolean;
   lastCheckInAt: string | null;
   lastWorkoutDate: string | null;
+  signedOut?: boolean;
+  lastLogoutAt?: string | null;
+  stepsToday?: number | null;
+  messagesSent?: number;
   // clients
   coachId?: string | null;
   coachName?: string | null;
@@ -283,9 +432,47 @@ export const dashboardAPI = {
       body: JSON.stringify({ identifier, password, ...(role ? { role } : {}) }),
     });
     // A temporary-password login has no token yet: keep it in memory only, never in storage
-    if (user.token && !user.mustChangePassword) authSession.set(user);
+    if (user.token && !user.mustChangePassword && user.onboardingCompleted !== false) authSession.set(user);
     return user;
   },
+
+  /** Tells the server the user signed out (so the monitor stops showing them online), then clears the session. */
+  logout: async () => {
+    const token = authSession.get()?.token;
+    authSession.clear();
+    if (!token || !API_BASE_URL) return;
+    try {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        keepalive: true,
+      });
+    } catch {
+      /* best effort */
+    }
+  },
+
+  /** Heartbeat: marks the user online and returns their unread message count. */
+  ping: () => apiFetch<{ serverTime: string; unreadMessages: number }>('/presence/ping', { method: 'POST' }),
+
+  // --- MESSAGING (client <-> their coach) ---
+  getThreads: () => apiFetch<{ threads: ChatThread[] }>('/messages/threads'),
+  getMessages: (clientId: string, opts: { after?: string; before?: string; limit?: number; markRead?: boolean } = {}) => {
+    const q = new URLSearchParams();
+    if (opts.after) q.set('after', opts.after);
+    if (opts.before) q.set('before', opts.before);
+    if (opts.limit) q.set('limit', String(opts.limit));
+    if (opts.markRead === false) q.set('markRead', 'false');
+    const qs = q.toString();
+    return apiFetch<ChatPage>(`/messages/${encodeURIComponent(clientId)}${qs ? `?${qs}` : ''}`);
+  },
+  sendMessage: (clientId: string, text: string, clientMsgId?: string) =>
+    apiFetch<{ message: ChatMessage }>(`/messages/${encodeURIComponent(clientId)}`, {
+      method: 'POST',
+      body: JSON.stringify({ text, clientMsgId }),
+    }),
+  markMessagesRead: (clientId: string) =>
+    apiFetch<{ message: string }>(`/messages/${encodeURIComponent(clientId)}/read`, { method: 'POST' }),
 
   completeFirstTimeSetup: async (payload: {
     userId: string;
@@ -348,7 +535,16 @@ export const dashboardAPI = {
 
   // --- COACH (always the signed-in coach's own data) ---
   getCoachData: (_coachId?: string) =>
-    apiFetch<{ stats: any[]; recentActivity: any[] }>(
+    apiFetch<{
+      stats: any[];
+      recentActivity: any[];
+      summary?: {
+        activeClients: number; onlineNow: number; workoutCompletion: number | null; sleepConsistency: number | null;
+        hydration: number | null; adherence: number | null; stepsPct: number | null; avgSteps: number | null; stepGoal: number;
+      };
+      weekly?: { date: string; stepsPct: number | null; workoutPct: number | null }[];
+      clients?: CoachClient[];
+    }>(
       `/coach/${encodeURIComponent(sessionId())}/dashboard`
     ),
   getCoachClients: (_coachId?: string) =>
@@ -366,6 +562,11 @@ export const dashboardAPI = {
     }),
   getTemplate: (templateId: string) =>
     apiFetch<any>(`/coach/templates/${encodeURIComponent(templateId)}`),
+  importTemplates: (templates: any[]) =>
+    apiFetch<ImportResult>(`/coach/${encodeURIComponent(sessionId())}/templates/import`, {
+      method: 'POST',
+      body: JSON.stringify({ templates }),
+    }),
   updateTemplate: (templateId: string, payload: any) =>
     apiFetch<any>(`/coach/templates/${encodeURIComponent(templateId)}`, {
       method: 'PUT',
@@ -466,6 +667,8 @@ export const dashboardAPI = {
     }),
 
   saveHealthMetrics: (data: {
+    date?: string;
+    source?: string;
     steps?: number;
     sleepHours?: number;
     calories?: number;
@@ -476,25 +679,6 @@ export const dashboardAPI = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
-
-  // --- WORKOUT IMAGE IMPORT ---
-  getWorkoutImageUploadUrl: (fileName: string, contentType: string) =>
-    apiFetch<{ uploadUrl: string; fields: Record<string, string>; objectKey: string; expiresIn: number }>(
-      `/coach/${encodeURIComponent(sessionId())}/templates/import/upload-url`,
-      { method: 'POST', body: JSON.stringify({ fileName, contentType }) }
-    ),
-
-  generateWorkoutFromImage: (objectKey: string) =>
-    apiFetch<{ objectKey: string; extracted: any }>(
-      `/coach/${encodeURIComponent(sessionId())}/templates/import/generate`,
-      { method: 'POST', body: JSON.stringify({ objectKey }) }
-    ),
-
-  approveWorkoutTemplate: (objectKey: string, template: any) =>
-    apiFetch<{ message: string; template: any }>(
-      `/coach/${encodeURIComponent(sessionId())}/templates/import/approve`,
-      { method: 'POST', body: JSON.stringify({ objectKey, template }) }
-    ),
 
   // --- TEMPLATE ASSIGNMENT ---
   assignTemplateToClient: (templateId: string, clientId: string, startDate?: string, notes?: string) =>

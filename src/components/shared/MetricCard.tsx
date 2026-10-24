@@ -2,6 +2,7 @@
 
 import React, { ReactNode, useEffect, useState } from "react";
 import ShapeFiller, { FillerShape } from "@/components/shared/ShapeFiller";
+import { mix } from "@/lib/format";
 
 interface MetricCardProps {
   title: string;
@@ -67,10 +68,10 @@ export default function MetricCard({
         minHeight: compact ? "145px" : "170px",
         padding: compact ? "18px" : "21px",
         borderRadius: "22px",
-        border: "1px solid rgba(255,255,255,0.065)",
-        background: "linear-gradient(145deg, rgba(4,5,6,0.985), rgba(0,0,0,0.99))",
+        border: "1px solid rgb(var(--ink-rgb) / 0.065)",
+        background: "linear-gradient(145deg, rgb(var(--well-rgb) / 0.985), rgb(var(--well-rgb) / 0.99))",
         boxShadow:
-          "inset 0 1px 0 rgba(255,255,255,0.018), 0 18px 42px rgba(0,0,0,0.25), 0 0 22px rgba(104,199,161,0.018)",
+          "inset 0 1px 0 rgb(var(--ink-rgb) / 0.018), 0 18px 42px rgb(var(--well-rgb) / 0.25), 0 0 22px rgb(var(--green-rgb) / 0.018)",
         overflow: "hidden",
       } as React.CSSProperties}
     >
@@ -122,9 +123,9 @@ export default function MetricCard({
               alignItems: "center",
               justifyContent: "center",
               color: accent,
-              background: `${accent}0e`,
-              border: `1px solid ${accent}18`,
-              boxShadow: `0 0 18px ${accent}08`,
+              background: `${mix(accent, "0e")}`,
+              border: `1px solid ${mix(accent, "18")}`,
+              boxShadow: `0 0 18px ${mix(accent, "08")}`,
             }}
           >
             {icon}
@@ -214,7 +215,7 @@ export default function MetricCard({
             style={{
               height: "4px",
               borderRadius: "999px",
-              background: "rgba(255,255,255,0.06)",
+              background: "rgb(var(--ink-rgb) / 0.06)",
               overflow: "hidden",
             }}
           >
@@ -225,7 +226,7 @@ export default function MetricCard({
                   width: `${animatedProgress}%`,
                   borderRadius: "999px",
                   background: accent,
-                  boxShadow: `0 0 7px ${accent}55`,
+                  boxShadow: `0 0 7px ${mix(accent, "55")}`,
                   transition: "width 80ms linear",
                 }}
               />
@@ -235,7 +236,7 @@ export default function MetricCard({
                   height: "100%",
                   width: "100%",
                   borderRadius: "999px",
-                  background: `repeating-linear-gradient(90deg, ${accent}22 0px, ${accent}22 6px, transparent 6px, transparent 12px)`,
+                  background: `repeating-linear-gradient(90deg, ${mix(accent, "22")} 0px, ${mix(accent, "22")} 6px, transparent 6px, transparent 12px)`,
                 }}
               />
             )}
@@ -251,7 +252,7 @@ export default function MetricCard({
             }}
           >
             <span>{progressLabel || "Progress"}</span>
-            <span style={{ color: hasProgress ? "var(--text-secondary)" : `${accent}88` }}>
+            <span style={{ color: hasProgress ? "var(--text-secondary)" : `${mix(accent, "88")}` }}>
               {hasProgress ? `${Math.round(animatedProgress)}%` : "no data"}
             </span>
           </div>
@@ -271,9 +272,9 @@ export default function MetricCard({
             style={{
               height: "3px",
               borderRadius: "999px",
-              background: "rgba(255,255,255,0.055)",
+              background: "rgb(var(--ink-rgb) / 0.055)",
               overflow: "hidden",
-              boxShadow: "inset 0 1px 1px rgba(0,0,0,0.25)",
+              boxShadow: "inset 0 1px 1px rgb(var(--well-rgb) / 0.25)",
             }}
           >
             <div
@@ -281,8 +282,8 @@ export default function MetricCard({
                 height: "100%",
                 width: hasProgress ? `${animatedProgress}%` : "0%",
                 borderRadius: "999px",
-                background: `linear-gradient(90deg, ${accent}66, ${accent})`,
-                boxShadow: hasProgress ? `0 0 10px ${accent}44` : "none",
+                background: `linear-gradient(90deg, ${mix(accent, "66")}, ${accent})`,
+                boxShadow: hasProgress ? `0 0 10px ${mix(accent, "44")}` : "none",
                 transition: "width 80ms linear",
               }}
             />
@@ -299,7 +300,7 @@ export default function MetricCard({
             }}
           >
             <span>{progressLabel || "Progress"}</span>
-            <span style={{ color: hasProgress ? accent : `${accent}55` }}>
+            <span style={{ color: hasProgress ? accent : `${mix(accent, "55")}` }}>
               {hasProgress ? `${Math.round(animatedProgress)}%` : "no data"}
             </span>
           </div>

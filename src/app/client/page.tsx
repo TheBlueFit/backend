@@ -7,6 +7,7 @@ import { GlassCard } from "@/components/GlassCard";
 import ClientTrackerDashboard from "@/components/client/ClientTrackerDashboard";
 import HealthSyncCard from "@/components/shared/HealthSyncCard";
 import ClientAssignedSchedules from "@/components/client/ClientAssignedSchedules";
+import DailyLogCard from "@/components/client/DailyLogCard";
 import { authSession, dashboardAPI } from "@/services/api";
 
 interface AthleteData {
@@ -23,6 +24,8 @@ interface AthleteData {
   workoutsThisWeek?: number;
   heartRate?: number;
   assignedSchedules?: any[];
+  healthSource?: string | null;
+  healthUpdatedAt?: string | null;
 }
 
 export default function AthleteDashboard() {
@@ -110,6 +113,15 @@ export default function AthleteDashboard() {
           <HealthSyncCard onSync={handleHealthSync} />
         </div>
 
+        <div style={{ marginBottom: "20px" }}>
+          <DailyLogCard
+            values={{ steps: athleteData?.steps, sleepHours: athleteData?.sleepHours, hydration: athleteData?.hydration }}
+            source={athleteData?.healthSource}
+            updatedAt={athleteData?.healthUpdatedAt}
+            onSaved={() => fetchDashboard()}
+          />
+        </div>
+
         <ClientTrackerDashboard
           steps={athleteData?.steps}
           stepGoal={athleteData?.stepGoal}
@@ -138,7 +150,7 @@ export default function AthleteDashboard() {
           {isLoading ? (
             <div style={{ padding: "30px", textAlign: "center", color: "var(--text-secondary)" }}>Loading training plan…</div>
           ) : !athleteData?.todayTraining?.length ? (
-            <div style={{ padding: "24px", textAlign: "center", color: "var(--text-secondary)", borderRadius: "16px", background: "rgba(255,255,255,0.025)" }}>
+            <div style={{ padding: "24px", textAlign: "center", color: "var(--text-secondary)", borderRadius: "16px", background: "rgb(var(--ink-rgb) / 0.025)" }}>
               No training scheduled for today yet.
             </div>
           ) : (

@@ -76,7 +76,7 @@ export default function ClientScheduleViewPage() {
           padding: 24,
           display: "grid",
           placeItems: "center",
-          color: "#fff",
+          color: "var(--text-primary)",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--text-secondary)" }}>
@@ -94,21 +94,21 @@ export default function ClientScheduleViewPage() {
           padding: 24,
           display: "grid",
           placeItems: "center",
-          color: "#fff",
+          color: "var(--text-primary)",
         }}
       >
         <div
           style={{
             maxWidth: 460,
             width: "100%",
-            background: "rgba(255,255,255,0.03)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            background: "rgb(var(--ink-rgb) / 0.03)",
+            border: "1px solid rgb(var(--ink-rgb) / 0.08)",
             borderRadius: 16,
             padding: 24,
             textAlign: "center",
           }}
         >
-          <AlertCircle size={28} color="#E5B869" style={{ marginBottom: 10 }} />
+          <AlertCircle size={28} color="var(--accent-gold)" style={{ marginBottom: 10 }} />
           <div style={{ fontSize: 15, fontWeight: 700 }}>Schedule unavailable</div>
           <div style={{ marginTop: 8, color: "var(--text-secondary)", fontSize: 13 }}>
             {error || "This schedule could not be loaded."}
@@ -121,7 +121,7 @@ export default function ClientScheduleViewPage() {
   const exercises = Array.isArray(schedule.exercises) ? schedule.exercises : [];
 
   return (
-    <main style={{ minHeight: "100vh", background: "#050505", color: "#fff", padding: "24px 18px 40px" }}>
+    <main style={{ minHeight: "100vh", background: "var(--bg-elev)", color: "var(--text-primary)", padding: "24px 18px 40px" }}>
       <div style={{ maxWidth: 980, margin: "0 auto" }}>
         <div style={{ marginBottom: 20 }}>
           <div style={{ color: "var(--accent-gold)", fontSize: 10, letterSpacing: "0.16em", fontWeight: 700 }}>THE BLUE FIT</div>
@@ -139,7 +139,7 @@ export default function ClientScheduleViewPage() {
             ["Duration", schedule.estimatedDuration || "—"],
             ["Equipment", schedule.equipment || "—"],
           ].map(([label, value]) => (
-            <div key={String(label)} style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 14 }}>
+            <div key={String(label)} style={{ background: "rgb(var(--ink-rgb) / 0.035)", border: "1px solid rgb(var(--ink-rgb) / 0.08)", borderRadius: 14, padding: 14 }}>
               <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--text-secondary)", textTransform: "uppercase" }}>{label}</div>
               <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.35 }}>{value}</div>
             </div>
@@ -147,17 +147,17 @@ export default function ClientScheduleViewPage() {
         </div>
 
         {schedule.notes && (
-          <div style={{ marginBottom: 18, background: "rgba(229,184,105,0.05)", border: "1px solid rgba(229,184,105,0.15)", borderRadius: 14, padding: 14 }}>
+          <div style={{ marginBottom: 18, background: "rgb(var(--gold-rgb) / 0.05)", border: "1px solid rgb(var(--gold-rgb) / 0.15)", borderRadius: 14, padding: 14 }}>
             <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--accent-gold)", textTransform: "uppercase" }}>Coach notes</div>
-            <div style={{ marginTop: 7, color: "rgba(255,255,255,0.82)", fontSize: 13, lineHeight: 1.55 }}>{schedule.notes}</div>
+            <div style={{ marginTop: 7, color: "rgb(var(--ink-rgb) / 0.82)", fontSize: 13, lineHeight: 1.55 }}>{schedule.notes}</div>
           </div>
         )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {exercises.map((ex: any, index: number) => (
-            <section key={String(ex.id || ex.order || index)} style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 15, padding: 15 }}>
+            <section key={String(ex.id || ex.order || index)} style={{ background: "rgb(var(--ink-rgb) / 0.035)", border: "1px solid rgb(var(--ink-rgb) / 0.08)", borderRadius: 15, padding: 15 }}>
               <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                <div style={{ width: 34, height: 34, borderRadius: 10, display: "grid", placeItems: "center", background: "rgba(0,226,123,0.09)", color: "#00E27B", flexShrink: 0 }}><Dumbbell size={16} /></div>
+                <div style={{ width: 34, height: 34, borderRadius: 10, display: "grid", placeItems: "center", background: "rgb(var(--green-rgb) / 0.09)", color: "var(--accent-green)", flexShrink: 0 }}><Dumbbell size={16} /></div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                     <h2 style={{ fontSize: 15, margin: 0 }}>{index + 1}. {ex.name || "Exercise"}</h2>
@@ -182,4 +182,4 @@ export default function ClientScheduleViewPage() {
   );
 }
 
-const pillStyle: React.CSSProperties = { fontSize: 11, padding: "6px 8px", borderRadius: 8, background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.8)" };
+const pillStyle: React.CSSProperties = { fontSize: 11, padding: "6px 8px", borderRadius: 8, background: "rgb(var(--ink-rgb) / 0.05)", color: "rgb(var(--ink-rgb) / 0.8)" };

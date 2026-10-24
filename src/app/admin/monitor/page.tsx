@@ -3,19 +3,20 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity, AlertTriangle, CalendarCheck, Clock3, Dumbbell, KeyRound, Loader2, LogIn,
-  Lock, Pause, Play, RefreshCw, Search, ShieldCheck, UserX, Users, Wifi,
+  Lock, LogOut, Pause, Play, RefreshCw, Search, ShieldCheck, UserX, Users, Wifi,
 } from "lucide-react";
 import { AdminMonitor, MonitorUser, Presence, dashboardAPI } from "@/services/api";
+import { mix } from "@/lib/format";
 
 type RoleTab = "ALL" | "CLIENT" | "COACH";
 type PresenceFilter = "ALL" | Presence;
 
 const PRESENCE: Record<Presence, { label: string; color: string; hint: string }> = {
-  ONLINE: { label: "Online now", color: "#00E27B", hint: "Active in the last 5 minutes" },
-  TODAY: { label: "Active today", color: "#60A5FA", hint: "Seen in the last 24 hours" },
-  RECENT: { label: "This week", color: "#E5B869", hint: "Seen in the last 7 days" },
-  INACTIVE: { label: "Inactive", color: "#FF6B61", hint: "Not seen for 7+ days" },
-  NEVER: { label: "Never signed in", color: "#8A8F98", hint: "Account created, not used yet" },
+  ONLINE: { label: "Online now", color: "var(--accent-green)", hint: "App open and active within the last 2½ minutes" },
+  TODAY: { label: "Active today", color: "var(--blue)", hint: "Seen in the last 24 hours" },
+  RECENT: { label: "This week", color: "var(--accent-gold)", hint: "Seen in the last 7 days" },
+  INACTIVE: { label: "Inactive", color: "var(--danger)", hint: "Not seen for 7+ days" },
+  NEVER: { label: "Never signed in", color: "var(--text-secondary)", hint: "Account created, not used yet" },
 };
 
 function ago(iso?: string | null): string {
@@ -61,8 +62,8 @@ function SummaryTile({ icon: Icon, label, value, color, onClick, active }: {
   );
   const style: React.CSSProperties = {
     display: "flex", flexDirection: "column", gap: 12, padding: 16, textAlign: "left",
-    background: active ? `${color}14` : "rgba(255,255,255,0.03)",
-    border: `1px solid ${active ? `${color}66` : "rgba(255,255,255,0.08)"}`,
+    background: active ? `${mix(color, "14")}` : "rgb(var(--ink-rgb) / 0.03)",
+    border: `1px solid ${active ? `${mix(color, "66")}` : "rgb(var(--ink-rgb) / 0.08)"}`,
     borderRadius: 16, color: "inherit", font: "inherit",
   };
   return onClick
@@ -72,7 +73,7 @@ function SummaryTile({ icon: Icon, label, value, color, onClick, active }: {
 
 function Chip({ icon: Icon, children, color = "var(--text-secondary)", title }: { icon?: React.ElementType; children: React.ReactNode; color?: string; title?: string }) {
   return (
-    <span title={title} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8, padding: "4px 8px" }}>
+    <span title={title} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color, background: "rgb(var(--ink-rgb) / 0.04)", border: "1px solid rgb(var(--ink-rgb) / 0.07)", borderRadius: 8, padding: "4px 8px" }}>
       {Icon && <Icon size={12} />}{children}
     </span>
   );
@@ -82,7 +83,7 @@ function UserCard({ user }: { user: MonitorUser }) {
   const p = PRESENCE[user.presence];
   const isClient = user.role === "CLIENT";
   return (
-    <article style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderLeft: `3px solid ${p.color}`, borderRadius: 14, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+    <article style={{ background: "rgb(var(--ink-rgb) / 0.03)", border: "1px solid rgb(var(--ink-rgb) / 0.08)", borderLeft: `3px solid ${p.color}`, borderRadius: 14, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <PresenceDot presence={user.presence} />
@@ -94,16 +95,19 @@ function UserCard({ user }: { user: MonitorUser }) {
           </div>
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: isClient ? "#60A5FA" : "#E5B869", background: isClient ? "rgba(96,165,250,0.1)" : "rgba(229,184,105,0.1)", border: `1px solid ${isClient ? "rgba(96,165,250,0.3)" : "rgba(229,184,105,0.3)"}`, padding: "3px 8px", borderRadius: 6 }}>
+          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: isClient ? "var(--blue)" : "var(--accent-gold)", background: isClient ? "rgb(var(--blue-rgb) / 0.1)" : "rgb(var(--gold-rgb) / 0.1)", border: `1px solid ${isClient ? "rgb(var(--blue-rgb) / 0.3)" : "rgb(var(--gold-rgb) / 0.3)"}`, padding: "3px 8px", borderRadius: 6 }}>
             {user.role}
           </span>
-          <span title={p.hint} style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.06em", color: p.color, background: `${p.color}18`, border: `1px solid ${p.color}44`, padding: "3px 8px", borderRadius: 6 }}>
+          <span title={p.hint} style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.06em", color: p.color, background: `${mix(p.color, "18")}`, border: `1px solid ${mix(p.color, "44")}`, padding: "3px 8px", borderRadius: 6 }}>
             {p.label.toUpperCase()}
           </span>
         </div>
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {user.signedOut && user.presence !== "NEVER" && (
+          <Chip icon={LogOut} title={`Signed out ${absolute(user.lastLogoutAt)}`}>Signed out</Chip>
+        )}
         <Chip icon={Clock3} title={absolute(user.lastSeenAt)}>Last seen {ago(user.lastSeenAt)}</Chip>
         <Chip icon={LogIn} title={absolute(user.lastLoginAt)}>Login {ago(user.lastLoginAt)} · {user.loginCount}×</Chip>
         {isClient ? (
@@ -111,21 +115,21 @@ function UserCard({ user }: { user: MonitorUser }) {
             <Chip icon={CalendarCheck} title={absolute(user.lastCheckInAt)}>Check-in {ago(user.lastCheckInAt)}</Chip>
             <Chip icon={Dumbbell}>{user.workoutsThisWeek ?? 0} workouts / 7d</Chip>
             <Chip icon={Activity}>{user.plansAssigned ?? 0} plan{user.plansAssigned === 1 ? "" : "s"}</Chip>
-            <Chip icon={Users} color={user.coachName ? "var(--text-secondary)" : "#FF6B61"}>
+            <Chip icon={Users} color={user.coachName ? "var(--text-secondary)" : "var(--danger)"}>
               {user.coachName ? `Coach: ${user.coachName}` : "No coach assigned"}
             </Chip>
           </>
         ) : (
           <>
             <Chip icon={Users}>{user.clientCount ?? 0} client{user.clientCount === 1 ? "" : "s"}</Chip>
-            <Chip icon={Wifi} color={(user.clientsOnlineNow ?? 0) > 0 ? "#00E27B" : undefined}>{user.clientsOnlineNow ?? 0} online now</Chip>
-            <Chip icon={AlertTriangle} color={(user.clientsNeedingAttention ?? 0) > 0 ? "#FF6B61" : undefined}>{user.clientsNeedingAttention ?? 0} need attention</Chip>
+            <Chip icon={Wifi} color={(user.clientsOnlineNow ?? 0) > 0 ? "var(--accent-green)" : undefined}>{user.clientsOnlineNow ?? 0} online now</Chip>
+            <Chip icon={AlertTriangle} color={(user.clientsNeedingAttention ?? 0) > 0 ? "var(--danger)" : undefined}>{user.clientsNeedingAttention ?? 0} need attention</Chip>
             <Chip icon={Dumbbell}>{user.templates ?? 0} template{user.templates === 1 ? "" : "s"}</Chip>
           </>
         )}
-        {user.pendingFirstLogin && <Chip icon={KeyRound} color="#E5B869">Temp password pending</Chip>}
-        {user.accountStatus === "LOCKED" && <Chip icon={Lock} color="#FF6B61">Locked (failed logins)</Chip>}
-        {user.accountStatus === "DISABLED" && <Chip icon={UserX} color="#FF6B61">Disabled</Chip>}
+        {user.pendingFirstLogin && <Chip icon={KeyRound} color="var(--accent-gold)">Temp password pending</Chip>}
+        {user.accountStatus === "LOCKED" && <Chip icon={Lock} color="var(--danger)">Locked (failed logins)</Chip>}
+        {user.accountStatus === "DISABLED" && <Chip icon={UserX} color="var(--danger)">Disabled</Chip>}
       </div>
     </article>
   );
@@ -208,14 +212,14 @@ export default function AdminMonitorPage() {
       ) : data && s ? (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 22 }}>
-            <SummaryTile icon={Wifi} label="Online now" value={s.onlineNow} color="#00E27B" onClick={() => pickPresence("ONLINE")} active={presence === "ONLINE"} />
-            <SummaryTile icon={Activity} label="Active today" value={s.activeToday} color="#60A5FA" onClick={() => pickPresence("TODAY")} active={presence === "TODAY"} />
+            <SummaryTile icon={Wifi} label="Online now" value={s.onlineNow} color="var(--accent-green)" onClick={() => pickPresence("ONLINE")} active={presence === "ONLINE"} />
+            <SummaryTile icon={Activity} label="Active today" value={s.activeToday} color="var(--blue)" onClick={() => pickPresence("TODAY")} active={presence === "TODAY"} />
             <SummaryTile icon={Users} label="Clients" value={s.totalClients} color="var(--text-primary)" onClick={() => setTab((t) => (t === "CLIENT" ? "ALL" : "CLIENT"))} active={tab === "CLIENT"} />
-            <SummaryTile icon={ShieldCheck} label="Coaches" value={s.totalCoaches} color="#E5B869" onClick={() => setTab((t) => (t === "COACH" ? "ALL" : "COACH"))} active={tab === "COACH"} />
-            <SummaryTile icon={UserX} label="Inactive 7d+" value={s.inactive7d} color="#FF6B61" onClick={() => pickPresence("INACTIVE")} active={presence === "INACTIVE"} />
-            <SummaryTile icon={KeyRound} label="Never signed in" value={s.neverSignedIn} color="#8A8F98" onClick={() => pickPresence("NEVER")} active={presence === "NEVER"} />
-            <SummaryTile icon={AlertTriangle} label="No coach" value={s.unassignedClients} color="#E5B869" />
-            <SummaryTile icon={Lock} label="Locked / disabled" value={s.lockedAccounts + s.disabledAccounts} color="#FF6B61" />
+            <SummaryTile icon={ShieldCheck} label="Coaches" value={s.totalCoaches} color="var(--accent-gold)" onClick={() => setTab((t) => (t === "COACH" ? "ALL" : "COACH"))} active={tab === "COACH"} />
+            <SummaryTile icon={UserX} label="Inactive 7d+" value={s.inactive7d} color="var(--danger)" onClick={() => pickPresence("INACTIVE")} active={presence === "INACTIVE"} />
+            <SummaryTile icon={KeyRound} label="Never signed in" value={s.neverSignedIn} color="var(--text-secondary)" onClick={() => pickPresence("NEVER")} active={presence === "NEVER"} />
+            <SummaryTile icon={AlertTriangle} label="No coach" value={s.unassignedClients} color="var(--accent-gold)" />
+            <SummaryTile icon={Lock} label="Locked / disabled" value={s.lockedAccounts + s.disabledAccounts} color="var(--danger)" />
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }} className="bf-monitor-layout">
@@ -248,7 +252,7 @@ export default function AdminMonitorPage() {
 
               <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 10 }}>{rows.length} shown</div>
               {rows.length === 0 ? (
-                <div style={{ padding: 30, textAlign: "center", color: "var(--text-secondary)", borderRadius: 14, background: "rgba(255,255,255,0.025)" }}>
+                <div style={{ padding: 30, textAlign: "center", color: "var(--text-secondary)", borderRadius: 14, background: "rgb(var(--ink-rgb) / 0.025)" }}>
                   No users match these filters.
                 </div>
               ) : (
@@ -267,8 +271,8 @@ export default function AdminMonitorPage() {
                   const Icon = e.type === "login" ? LogIn : e.type === "checkin" ? CalendarCheck : Dumbbell;
                   const verb = e.type === "login" ? "signed in" : e.type === "checkin" ? "submitted a check-in" : "completed a workout";
                   return (
-                    <div key={`${e.type}-${e.userId}-${i}`} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "9px 11px", borderRadius: 11, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                      <Icon size={15} color={e.type === "login" ? "#60A5FA" : e.type === "checkin" ? "#E5B869" : "#00E27B"} style={{ marginTop: 2, flexShrink: 0 }} />
+                    <div key={`${e.type}-${e.userId}-${i}`} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "9px 11px", borderRadius: 11, background: "rgb(var(--ink-rgb) / 0.03)", border: "1px solid rgb(var(--ink-rgb) / 0.06)" }}>
+                      <Icon size={15} color={e.type === "login" ? "var(--blue)" : e.type === "checkin" ? "var(--accent-gold)" : "var(--accent-green)"} style={{ marginTop: 2, flexShrink: 0 }} />
                       <div style={{ minWidth: 0, fontSize: 12, lineHeight: 1.4 }}>
                         <strong>{e.name || e.userId}</strong> <span style={{ color: "var(--text-secondary)" }}>({e.role.toLowerCase()}) {verb}</span>
                         <div style={{ fontSize: 10, color: "var(--text-secondary)" }} title={absolute(e.at)}>{e.type === "workout" ? e.at.slice(0, 10) : ago(e.at)}</div>

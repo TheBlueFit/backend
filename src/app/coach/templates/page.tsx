@@ -72,9 +72,9 @@ export default function PlanTemplates() {
     }
   };
 
-  const handleImportSaved = (template: any) => {
+  const handleImportSaved = (created: any[]) => {
     setShowImport(false);
-    setTemplates((prev) => [template, ...prev]);
+    if (created?.length) fetchTemplates(); // reload so counts/fields match what the server saved
   };
 
   return (
@@ -117,7 +117,7 @@ export default function PlanTemplates() {
                   lineHeight: "1.2",
                 }}
               >
-                <span style={{ color: "#E5B869" }}>Plan</span>
+                <span style={{ color: "var(--accent-gold)" }}>Plan</span>
                 <br />
                 <span className="animated-gradient-text">Templates</span>
               </h1>
@@ -154,10 +154,10 @@ export default function PlanTemplates() {
                   alignItems: "center",
                   gap: "6px",
                   background: showImport
-                    ? "rgba(229,184,105,0.2)"
-                    : "rgba(229,184,105,0.1)",
-                  color: "#E5B869",
-                  border: "1px solid rgba(229,184,105,0.4)",
+                    ? "rgb(var(--gold-rgb) / 0.2)"
+                    : "rgb(var(--gold-rgb) / 0.1)",
+                  color: "var(--accent-gold)",
+                  border: "1px solid rgb(var(--gold-rgb) / 0.4)",
                   borderRadius: "8px",
                   cursor: "pointer",
                   whiteSpace: "nowrap",
@@ -177,9 +177,9 @@ export default function PlanTemplates() {
                   display: "flex",
                   alignItems: "center",
                   gap: "6px",
-                  background: "rgba(0,122,255,0.15)",
-                  color: "#60A5FA",
-                  border: "1px solid rgba(0,122,255,0.4)",
+                  background: "rgb(var(--blue-rgb) / 0.15)",
+                  color: "var(--blue)",
+                  border: "1px solid rgb(var(--blue-rgb) / 0.4)",
                   borderRadius: "8px",
                   cursor: "pointer",
                 }}
@@ -205,8 +205,8 @@ export default function PlanTemplates() {
               style={{
                 marginBottom: "28px",
                 padding: "24px",
-                background: "rgba(229,184,105,0.04)",
-                border: "1px solid rgba(229,184,105,0.2)",
+                background: "rgb(var(--gold-rgb) / 0.04)",
+                border: "1px solid rgb(var(--gold-rgb) / 0.2)",
                 borderRadius: "16px",
               }}
             >
@@ -218,17 +218,17 @@ export default function PlanTemplates() {
                   marginBottom: "20px",
                 }}
               >
-                <Upload size={18} color="#E5B869" />
+                <Upload size={18} color="var(--accent-gold)" />
 
                 <h3
                   style={{
                     fontSize: "16px",
                     fontWeight: 700,
-                    color: "#fff",
+                    color: "var(--text-primary)",
                     margin: 0,
                   }}
                 >
-                  Import Workout Template
+                  Import Workout Templates (JSON)
                 </h3>
               </div>
 
@@ -284,9 +284,9 @@ export default function PlanTemplates() {
                 <div
                   key={template.id}
                   style={{
-                    background: "rgba(255,255,255,0.03)",
+                    background: "rgb(var(--ink-rgb) / 0.03)",
                     backdropFilter: "blur(16px)",
-                    border: "1px solid rgba(255,255,255,0.08)",
+                    border: "1px solid rgb(var(--ink-rgb) / 0.08)",
                     borderRadius: "16px",
                     padding: "22px",
                     display: "flex",
@@ -313,7 +313,7 @@ export default function PlanTemplates() {
                         style={{
                           fontSize: "17px",
                           fontWeight: "bold",
-                          color: "#fff",
+                          color: "var(--text-primary)",
                           margin: "0 0 4px",
                         }}
                       >
@@ -352,11 +352,11 @@ export default function PlanTemplates() {
                           }
                           title="View reference image"
                           style={{
-                            background: "rgba(229,184,105,0.1)",
+                            background: "rgb(var(--gold-rgb) / 0.1)",
                             border:
-                              "1px solid rgba(229,184,105,0.3)",
+                              "1px solid rgb(var(--gold-rgb) / 0.3)",
                             borderRadius: "8px",
-                            color: "#E5B869",
+                            color: "var(--accent-gold)",
                             cursor: "pointer",
                             padding: "7px",
                             display: "flex",
@@ -372,9 +372,9 @@ export default function PlanTemplates() {
                           template.id
                         )}`}
                         style={{
-                          background: "rgba(255,255,255,0.06)",
+                          background: "rgb(var(--ink-rgb) / 0.06)",
                           border:
-                            "1px solid rgba(255,255,255,0.1)",
+                            "1px solid rgb(var(--ink-rgb) / 0.1)",
                           borderRadius: "8px",
                           color: "var(--text-secondary)",
                           padding: "7px",
@@ -395,11 +395,11 @@ export default function PlanTemplates() {
                         }
                         title="Assign to client"
                         style={{
-                          background: "rgba(0,226,123,0.1)",
+                          background: "rgb(var(--green-rgb) / 0.1)",
                           border:
-                            "1px solid rgba(0,226,123,0.3)",
+                            "1px solid rgb(var(--green-rgb) / 0.3)",
                           borderRadius: "8px",
-                          color: "#00E27B",
+                          color: "var(--accent-green)",
                           cursor: "pointer",
                           padding: "7px",
                           display: "flex",
@@ -417,7 +417,7 @@ export default function PlanTemplates() {
                       gridTemplateColumns: "1fr 1fr",
                       gap: "8px",
                       padding: "14px",
-                      background: "rgba(0,0,0,0.2)",
+                      background: "rgb(var(--well-rgb) / 0.2)",
                       borderRadius: "12px",
                     }}
                   >
@@ -429,7 +429,7 @@ export default function PlanTemplates() {
                           gap: "8px",
                         }}
                       >
-                        <Activity size={13} color="#00E27B" />
+                        <Activity size={13} color="var(--accent-green)" />
                         <span
                           style={{
                             fontSize: "12px",
@@ -449,7 +449,7 @@ export default function PlanTemplates() {
                           gap: "8px",
                         }}
                       >
-                        <Calendar size={13} color="#60A5FA" />
+                        <Calendar size={13} color="var(--blue)" />
                         <span
                           style={{
                             fontSize: "12px",
@@ -469,7 +469,7 @@ export default function PlanTemplates() {
                           gap: "8px",
                         }}
                       >
-                        <Utensils size={13} color="#E5B869" />
+                        <Utensils size={13} color="var(--accent-gold)" />
                         <span
                           style={{
                             fontSize: "12px",
@@ -533,11 +533,11 @@ export default function PlanTemplates() {
                     style={{
                       width: "100%",
                       padding: "13px",
-                      background: "rgba(0,226,123,0.08)",
+                      background: "rgb(var(--green-rgb) / 0.08)",
                       border:
-                        "1px solid rgba(0,226,123,0.25)",
+                        "1px solid rgb(var(--green-rgb) / 0.25)",
                       borderRadius: "10px",
-                      color: "#00E27B",
+                      color: "var(--accent-green)",
                       fontSize: "12px",
                       fontWeight: 700,
                       letterSpacing: "0.08em",

@@ -2,7 +2,9 @@
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CalendarDays, Dumbbell, TrendingUp } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Dumbbell, MessageSquare, TrendingUp } from 'lucide-react';
+import { PresenceBadge } from '@/components/shared/Presence';
+import { fmtNum } from '@/lib/format';
 import { dashboardAPI, CoachClient } from '@/services/api';
 
 // 1. Child component that uses the search params (?id=...)
@@ -81,6 +83,14 @@ function ClientDetailsContent() {
                 <span className="label-text" style={{ fontSize: '11px' }}>Last check-in</span>
                 <span style={{ fontSize: '18px', fontWeight: 600 }}>{client.lastCheckIn}</span>
               </div>
+              <div style={tile}>
+                <span className="label-text" style={{ fontSize: '11px' }}>Steps (latest)</span>
+                <span style={{ fontSize: '18px', fontWeight: 600 }}>{fmtNum(client.stepsToday)}</span>
+              </div>
+              <div style={tile}>
+                <span className="label-text" style={{ fontSize: '11px' }}>Status</span>
+                <span><PresenceBadge presence={client.presence} lastSeenAt={client.lastSeenAt} /></span>
+              </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
@@ -99,20 +109,28 @@ function ClientDetailsContent() {
               >
                 VIEW CHECK STATUS
               </Link>
+
+              <Link
+                href={`/coach/messages?client=${encodeURIComponent(client.id)}`}
+                className="btn-secondary"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', textDecoration: 'none' }}
+              >
+                <MessageSquare size={15} /> MESSAGE
+              </Link>
             </div>
 
             <div style={{ marginTop: '28px' }}>
               <div className="label-text" style={{ fontSize: '11px', marginBottom: '10px', color: 'var(--text-secondary)' }}>ASSIGNED WORKOUT PLANS</div>
               {schedules.length === 0 ? (
-                <div style={{ padding: '18px', borderRadius: '12px', background: 'rgba(255,255,255,0.025)', color: 'var(--text-secondary)', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ padding: '18px', borderRadius: '12px', background: 'rgb(var(--ink-rgb) / 0.025)', color: 'var(--text-secondary)', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
                   <span>No plan assigned yet.</span>
                   <Link href="/coach/templates" className="btn-secondary" style={{ textDecoration: 'none', fontSize: '12px' }}>Open templates to assign one</Link>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {schedules.map((sch) => (
-                    <div key={sch.assignmentId} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                      <span style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'rgba(96,165,250,0.09)', color: '#60A5FA', flexShrink: 0 }}><Dumbbell size={16} /></span>
+                    <div key={sch.assignmentId} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', borderRadius: '12px', background: 'rgb(var(--ink-rgb) / 0.03)', border: '1px solid rgb(var(--ink-rgb) / 0.07)' }}>
+                      <span style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'rgb(var(--blue-rgb) / 0.09)', color: 'var(--blue)', flexShrink: 0 }}><Dumbbell size={16} /></span>
                       <span style={{ minWidth: 0 }}>
                         <span style={{ display: 'block', fontSize: '14px', fontWeight: 700 }}>{sch.templateTitle || 'Workout plan'}</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px', fontSize: '11px', color: 'var(--text-secondary)' }}>
@@ -135,7 +153,7 @@ function ClientDetailsContent() {
 // 2. Wrap the child component with Suspense in the default export
 export default function ClientDetailsPage() {
   return (
-    <Suspense fallback={<div style={{ padding: '24px', color: 'white' }}>Loading client profile...</div>}>
+    <Suspense fallback={<div style={{ padding: '24px', color: 'var(--text-primary)' }}>Loading client profile...</div>}>
       <ClientDetailsContent />
     </Suspense>
   );

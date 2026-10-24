@@ -4,11 +4,14 @@ import React, { useEffect, useState } from "react";
 import { Activity, AlertCircle, CheckCircle2 } from "lucide-react";
 import { GlassCard } from "@/components/GlassCard";
 import CoachTrackerDashboard from "@/components/coach/CoachTrackerDashboard";
-import { authSession, dashboardAPI } from "@/services/api";
+import ClientStepsPanel from "@/components/coach/ClientStepsPanel";
+import { authSession, CoachClient, dashboardAPI } from "@/services/api";
 
 interface CoachDashboardData {
   stats: any[];
   recentActivity: any[];
+  clients?: CoachClient[];
+  summary?: { stepGoal?: number };
 }
 
 function getStat(stats: any[], names: string[]): number | undefined {
@@ -52,8 +55,10 @@ export default function CoachDashboard() {
     };
 
     fetchDashboard();
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") fetchDashboard(); }, 60_000);
     return () => {
       mounted = false;
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -109,6 +114,8 @@ export default function CoachDashboard() {
         hydration={hydration}
         adherence={adherence}
       />
+
+      <ClientStepsPanel clients={dashboardData?.clients ?? []} goal={dashboardData?.summary?.stepGoal ?? 10000} loading={isLoading} />
 
       <section className="app-card fade-in" style={{ marginTop: "24px" }}>
         <div className="section-header" style={{ marginBottom: "18px" }}>

@@ -1,11 +1,11 @@
 // app/page.tsx — single unified login (no role selector: the server detects it)
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, Upload } from "lucide-react";
-import { dashboardAPI, UserSession } from "@/services/api";
+import { authSession, dashboardAPI, sessionExpired, UserSession } from "@/services/api";
 
 type SetupStep = 1 | 2 | 3;
 
@@ -15,7 +15,7 @@ const MEALS = ["Breakfast", "Brunch", "Lunch", "Snacks", "Dinner"] as const;
 const inputStyle = {
   width: "100%",
   padding: "14px",
-  background: "rgba(0,0,0,0.4)",
+  background: "rgb(var(--well-rgb) / 0.4)",
   border: "1px solid var(--border-subtle)",
   borderRadius: "var(--radius-sm)",
   color: "var(--text-primary)",
@@ -73,6 +73,13 @@ export default function OpeningPortalPage() {
     else if (role === "COACH") router.push("/coach");
     else router.push("/admin");
   };
+
+  // Already signed in on this device? Go straight to the right area instead of asking again.
+  useEffect(() => {
+    const existing = authSession.get();
+    if (existing?.token && !sessionExpired(existing)) routeByRole(existing.role);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -371,7 +378,7 @@ export default function OpeningPortalPage() {
                 <div style={panelStyle}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", gap: "12px", flexWrap: "wrap" }}>
                     <h3 style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-primary)", fontSize: "16px", fontWeight: "600", margin: 0 }}>
-                      <Camera size={18} color="#60A5FA" />
+                      <Camera size={18} color="var(--blue)" />
                       {activeDay} Dietary Recall
                     </h3>
                     <span style={{ color: "var(--text-secondary)", fontSize: "12px" }}>Photos are optional</span>
@@ -386,7 +393,7 @@ export default function OpeningPortalPage() {
                       const key = `${activeDayNumber}|${meal}`;
                       const selectedFile = threeDayPhotos[key];
                       return (
-                        <label key={`${activeDay}-${meal}`} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "150px", border: "2px dashed var(--border-subtle)", borderRadius: "var(--radius-sm)", background: "rgba(0,0,0,0.2)", cursor: "pointer", transition: "all 0.2s ease", textAlign: "center", padding: "12px" }}>
+                        <label key={`${activeDay}-${meal}`} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "150px", border: "2px dashed var(--border-subtle)", borderRadius: "var(--radius-sm)", background: "rgb(var(--well-rgb) / 0.2)", cursor: "pointer", transition: "all 0.2s ease", textAlign: "center", padding: "12px" }}>
                           <Upload size={24} color="var(--text-secondary)" style={{ marginBottom: "12px" }} />
                           <span className="label-text" style={{ color: "var(--text-primary)", marginBottom: "4px" }}>{meal}</span>
                           <span style={{ color: "var(--text-secondary)", fontSize: "10px" }}>{selectedFile ? "Photo selected ✓" : "Optional"}</span>

@@ -259,10 +259,10 @@ function savePermissions(p: PermissionStates) {
 
 // ── Status badge ───────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: PermissionStates[keyof PermissionStates] }) {
-  if (status === "granted") return <CheckCircle2 size={18} color="#00E27B" />;
-  if (status === "denied") return <XCircle size={18} color="#FF453A" />;
-  if (status === "unavailable") return <AlertCircle size={18} color="rgba(255,255,255,0.3)" />;
-  return <div style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.2)" }} />;
+  if (status === "granted") return <CheckCircle2 size={18} color="var(--accent-green)" />;
+  if (status === "denied") return <XCircle size={18} color="var(--danger)" />;
+  if (status === "unavailable") return <AlertCircle size={18} color="rgb(var(--ink-rgb) / 0.3)" />;
+  return <div style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid rgb(var(--ink-rgb) / 0.2)" }} />;
 }
 
 // ── Gate component ─────────────────────────────────────────────────────────────
@@ -393,7 +393,7 @@ export default function MobilePermissionsGate({ children }: GateProps) {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(8,8,14,0.99)",
+            background: "rgb(var(--well-rgb) / 0.99)",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -407,10 +407,10 @@ export default function MobilePermissionsGate({ children }: GateProps) {
 
             {/* Logo / headline */}
             <div style={{ textAlign: "center", marginBottom: "36px" }}>
-              <div style={{ width: "64px", height: "64px", borderRadius: "18px", background: "rgba(229,184,105,0.12)", border: "1px solid rgba(229,184,105,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
-                <Heart size={30} color="#E5B869" />
+              <div style={{ width: "64px", height: "64px", borderRadius: "18px", background: "rgb(var(--gold-rgb) / 0.12)", border: "1px solid rgb(var(--gold-rgb) / 0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+                <Heart size={30} color="var(--accent-gold)" />
               </div>
-              <h1 style={{ fontSize: "24px", fontWeight: 800, color: "#fff", margin: "0 0 10px", letterSpacing: "-0.3px" }}>
+              <h1 style={{ fontSize: "24px", fontWeight: 800, color: "var(--text-primary)", margin: "0 0 10px", letterSpacing: "-0.3px" }}>
                 A few quick permissions
               </h1>
               <p style={{ fontSize: "14px", color: "var(--text-secondary)", margin: 0, lineHeight: "1.6" }}>
@@ -431,8 +431,8 @@ export default function MobilePermissionsGate({ children }: GateProps) {
                       alignItems: "flex-start",
                       gap: "16px",
                       padding: "16px 18px",
-                      background: isActive ? "rgba(229,184,105,0.07)" : "rgba(255,255,255,0.03)",
-                      border: `1px solid ${isActive ? "rgba(229,184,105,0.35)" : status === "denied" ? "rgba(255,69,58,0.3)" : status === "granted" ? "rgba(0,226,123,0.25)" : "rgba(255,255,255,0.07)"}`,
+                      background: isActive ? "rgb(var(--gold-rgb) / 0.07)" : "rgb(var(--ink-rgb) / 0.03)",
+                      border: `1px solid ${isActive ? "rgb(var(--gold-rgb) / 0.35)" : status === "denied" ? "rgb(var(--red-rgb) / 0.3)" : status === "granted" ? "rgb(var(--green-rgb) / 0.25)" : "rgb(var(--ink-rgb) / 0.07)"}`,
                       borderRadius: "14px",
                       transition: "all 0.25s",
                     }}
@@ -440,24 +440,24 @@ export default function MobilePermissionsGate({ children }: GateProps) {
                     <div
                       style={{
                         width: "40px", height: "40px", borderRadius: "10px",
-                        background: status === "denied" ? "rgba(255,69,58,0.12)" : status === "granted" ? "rgba(0,226,123,0.1)" : "rgba(229,184,105,0.1)",
-                        border: `1px solid ${status === "denied" ? "rgba(255,69,58,0.3)" : status === "granted" ? "rgba(0,226,123,0.25)" : "rgba(229,184,105,0.25)"}`,
+                        background: status === "denied" ? "rgb(var(--red-rgb) / 0.12)" : status === "granted" ? "rgb(var(--green-rgb) / 0.1)" : "rgb(var(--gold-rgb) / 0.1)",
+                        border: `1px solid ${status === "denied" ? "rgb(var(--red-rgb) / 0.3)" : status === "granted" ? "rgb(var(--green-rgb) / 0.25)" : "rgb(var(--gold-rgb) / 0.25)"}`,
                         display: "flex", alignItems: "center", justifyContent: "center",
                         flexShrink: 0,
                       }}
                     >
                       {isActive
-                        ? <Loader2 size={20} color="#E5B869" style={{ animation: "spin 1s linear infinite" }} />
-                        : <meta.Icon size={20} color={status === "denied" ? "#FF453A" : status === "granted" ? "#00E27B" : "#E5B869"} />}
+                        ? <Loader2 size={20} color="var(--accent-gold)" style={{ animation: "spin 1s linear infinite" }} />
+                        : <meta.Icon size={20} color={status === "denied" ? "var(--danger)" : status === "granted" ? "var(--accent-green)" : "var(--accent-gold)"} />}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
-                        <span style={{ fontSize: "14px", fontWeight: 700, color: "#fff" }}>
+                        <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-primary)" }}>
                           {meta.title}
                           {meta.optional && <span style={{ fontSize: "10px", color: "var(--text-secondary)", marginLeft: "6px", fontWeight: 400 }}>optional</span>}
                         </span>
                         {isActive
-                          ? <span style={{ fontSize: "11px", color: "#E5B869", fontWeight: 600 }}>Requesting…</span>
+                          ? <span style={{ fontSize: "11px", color: "var(--accent-gold)", fontWeight: 600 }}>Requesting…</span>
                           : <StatusBadge status={status} />}
                       </div>
                       <p style={{ fontSize: "12px", color: "var(--text-secondary)", margin: 0, lineHeight: "1.5" }}>
@@ -466,7 +466,7 @@ export default function MobilePermissionsGate({ children }: GateProps) {
                       {status === "denied" && (
                         <button
                           onClick={openNativeSettings}
-                          style={{ marginTop: "8px", fontSize: "11px", color: "#60A5FA", background: "transparent", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: "4px" }}
+                          style={{ marginTop: "8px", fontSize: "11px", color: "var(--blue)", background: "transparent", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: "4px" }}
                         >
                           <Settings size={11} /> Open Settings to enable
                         </button>
@@ -484,10 +484,10 @@ export default function MobilePermissionsGate({ children }: GateProps) {
                 style={{
                   width: "100%",
                   padding: "16px",
-                  background: "rgba(229,184,105,0.15)",
-                  border: "1px solid rgba(229,184,105,0.45)",
+                  background: "rgb(var(--gold-rgb) / 0.15)",
+                  border: "1px solid rgb(var(--gold-rgb) / 0.45)",
                   borderRadius: "14px",
-                  color: "#E5B869",
+                  color: "var(--accent-gold)",
                   fontSize: "15px",
                   fontWeight: 700,
                   letterSpacing: "0.04em",
@@ -519,7 +519,7 @@ export default function MobilePermissionsGate({ children }: GateProps) {
                 width: "100%",
                 padding: "14px",
                 background: "transparent",
-                border: "1px solid rgba(255,255,255,0.1)",
+                border: "1px solid rgb(var(--ink-rgb) / 0.1)",
                 borderRadius: "14px",
                 color: "var(--text-secondary)",
                 fontSize: "13px",
@@ -544,8 +544,8 @@ export default function MobilePermissionsGate({ children }: GateProps) {
   if (!gateDone) {
     // Brief loading splash while detecting platform
     return (
-      <div style={{ position: "fixed", inset: 0, background: "rgba(8,8,14,0.99)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
-        <Loader2 size={32} color="#E5B869" style={{ animation: "spin 1s linear infinite" }} />
+      <div style={{ position: "fixed", inset: 0, background: "rgb(var(--well-rgb) / 0.99)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
+        <Loader2 size={32} color="var(--accent-gold)" style={{ animation: "spin 1s linear infinite" }} />
       </div>
     );
   }
