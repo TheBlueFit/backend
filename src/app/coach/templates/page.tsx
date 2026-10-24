@@ -13,11 +13,13 @@ import {
   Image as ImageIcon,
   Zap,
   Clock,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { dashboardAPI } from "@/services/api";
 import WorkoutImageImport from "@/components/coach/WorkoutImageImport";
+import { CATEGORIES, CategoryId, STARTERS, StarterTemplate, starterExercises } from "@/lib/exerciseLibrary";
 import AssignTemplateModal from "@/components/coach/AssignTemplateModal";
 import MediaViewerModal from "@/components/shared/MediaViewerModal";
 
@@ -30,6 +32,9 @@ export default function PlanTemplates() {
 
   // Modals
   const [showImport, setShowImport] = useState(false);
+  const [showStarters, setShowStarters] = useState(false);
+  const [starterCat, setStarterCat] = useState<CategoryId>("STRENGTH");
+  const [startingId, setStartingId] = useState<string | null>(null);
   const [assignTarget, setAssignTarget] = useState<{
     id: string;
     title: string;
@@ -69,6 +74,22 @@ export default function PlanTemplates() {
     } catch (err: any) {
       setError(err.message || "Could not create a template.");
       setIsCreating(false);
+    }
+  };
+
+  const useStarter = async (st: StarterTemplate) => {
+    setStartingId(st.id);
+    setError(null);
+    try {
+      const created = await dashboardAPI.createTemplate({
+        title: st.title, description: st.description, goal: st.goal, level: st.level,
+        workoutDays: st.workoutDays, estimatedDuration: st.estimatedDuration, equipment: st.equipment,
+        exercises: starterExercises(st),
+      });
+      router.push(`/coach/templates/edit?id=${encodeURIComponent(created.id)}`);
+    } catch (err: any) {
+      setError(err.message || "Could not create this template.");
+      setStartingId(null);
     }
   };
 
@@ -144,6 +165,14 @@ export default function PlanTemplates() {
                 alignItems: "flex-end",
               }}
             >
+              <button
+                onClick={() => setShowStarters((v) => !v)}
+                style={{ padding: "10px 14px", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px", background: showStarters ? "rgb(var(--green-rgb) / 0.2)" : "rgb(var(--green-rgb) / 0.1)", color: "var(--accent-green)", border: "1px solid rgb(var(--green-rgb) / 0.4)", borderRadius: "8px", cursor: "pointer", whiteSpace: "nowrap" }}
+              >
+                {showStarters ? <X size={14} /> : <Sparkles size={14} />}
+                {showStarters ? "CLOSE SAMPLES" : "START FROM A SAMPLE"}
+              </button>
+
               {/* Import existing workout template */}
               <button
                 onClick={() => setShowImport((v) => !v)}
@@ -236,6 +265,41 @@ export default function PlanTemplates() {
                 onSaved={handleImportSaved}
                 onCancel={() => setShowImport(false)}
               />
+            </div>
+          )}
+
+          {/* Sample templates */}
+          {showStarters && (
+            <div style={{ marginBottom: "28px", padding: "20px", background: "rgb(var(--green-rgb) / 0.04)", border: "1px solid rgb(var(--green-rgb) / 0.2)", borderRadius: "16px" }}>
+              <h3 style={{ fontSize: "16px", fontWeight: 700, margin: "0 0 4px" }}>Sample templates</h3>
+              <p style={{ fontSize: "12px", color: "var(--text-secondary)", margin: "0 0 14px" }}>Pick a starting point. It opens in the editor, where you can swap variations, reorder and edit everything for your client.</p>
+              <div style={{ display: "flex", gap: "8px", overflowX: "auto", marginBottom: "14px" }}>
+                {CATEGORIES.map((c) => (
+                  <button key={c.id} type="button" onClick={() => setStarterCat(c.id)}
+                    style={{ flex: "0 0 auto", padding: "8px 14px", borderRadius: "10px", fontSize: "12px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", border: "1px solid var(--border-subtle)", background: starterCat === c.id ? "var(--text-primary)" : "transparent", color: starterCat === c.id ? "var(--bg-app)" : "var(--text-primary)" }}>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {STARTERS.filter((st) => st.category === starterCat).map((st) => (
+                  <div key={st.id} style={{ padding: "14px", borderRadius: "12px", border: "1px solid var(--border-subtle)", background: "rgb(var(--ink-rgb) / 0.03)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "flex-start" }}>
+                      <div style={{ minWidth: 0 }}>
+                        <strong style={{ fontSize: "14px" }}>{st.title}</strong>
+                        <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "4px" }}>{st.level} · {st.workoutDays} · {st.estimatedDuration} · {st.equipment}</div>
+                      </div>
+                      <button type="button" disabled={startingId !== null} onClick={() => useStarter(st)} className="btn-primary" style={{ padding: "8px 14px", fontSize: "11px", flex: "none", opacity: startingId && startingId !== st.id ? 0.5 : 1 }}>
+                        {startingId === st.id ? "Creating…" : "Use this"}
+                      </button>
+                    </div>
+                    <p style={{ fontSize: "12px", color: "var(--text-secondary)", margin: "8px 0" }}>{st.description}</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                      {st.names.map((n) => <span key={n} style={{ fontSize: "11px", padding: "3px 8px", borderRadius: "999px", background: "rgb(var(--ink-rgb) / 0.06)" }}>{n}</span>)}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

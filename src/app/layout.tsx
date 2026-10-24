@@ -18,9 +18,10 @@ import {
   Users,
   Utensils,
   X,
+  Palette,
 } from "lucide-react";
 import { authSession, dashboardAPI, sessionExpired, UserSession } from "@/services/api";
-import ThemeProvider, { ThemeToggle, THEME_INIT_SCRIPT } from "@/components/shell/ThemeProvider";
+import ThemeProvider, { AppearanceButton, ThemeToggle, THEME_INIT_SCRIPT, useTheme } from "@/components/shell/ThemeProvider";
 import { AppContext } from "@/components/shell/AppContext";
 import MobilePermissionsGate from "@/components/shared/MobilePermissionsGate";
 
@@ -56,6 +57,17 @@ const PORTAL_LABEL: Record<"ADMIN" | "COACH" | "CLIENT", string> = {
   COACH: "COACH PORTAL",
   CLIENT: "ATHLETE PORTAL",
 };
+
+function AppearanceNavItem({ index, onOpen }: { index: number; onOpen: () => void }) {
+  const { openAppearance } = useTheme();
+  return (
+    <button type="button" className="bluefit-pop-nav-item" style={{ "--nav-i": index, width: "100%", font: "inherit", cursor: "pointer", textAlign: "left" } as React.CSSProperties}
+      onClick={() => { onOpen(); openAppearance(); }}>
+      <Palette size={21} strokeWidth={1.8} />
+      <span>Appearance</span>
+    </button>
+  );
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -347,7 +359,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </head>
         <body>
           <ThemeProvider>
-            <div className="theme-fab"><ThemeToggle compact /></div>
+            <div className="theme-fab" style={{ display: "flex", gap: 8 }}><AppearanceButton compact /><ThemeToggle compact /></div>
             <main className="main-content" style={{ width: "100%" }}>
               {children}
             </main>
@@ -431,6 +443,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </Link>
               );
             })}
+
+            <AppearanceNavItem index={items.length} onOpen={() => setIsMenuOpen(false)} />
 
             <button
               type="button"
